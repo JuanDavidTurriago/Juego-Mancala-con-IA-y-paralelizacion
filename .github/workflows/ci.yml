@@ -1,0 +1,18 @@
+name: ci
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build motor
+        run: |
+          cmake -S motor -B motor/build
+          cmake --build motor/build -j
+      - name: Run motor tests
+        run: |
+          ./motor/build/test_board
