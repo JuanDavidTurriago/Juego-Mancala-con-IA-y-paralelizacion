@@ -6,7 +6,7 @@ Proyecto final del curso: motores paralelos de Mancala (Kalah) y despliegue en K
 
 Reemplace los campos pendientes con la informacion real del grupo:
 
-- P1: NOMBRE APELLIDO - CODIGO - correo@correounivalle.edu.co
+- P1: Juan David Turriago - 2477182 - juan.turriago@correounivalle.edu.co
 - P2: NOMBRE APELLIDO - CODIGO - correo@correounivalle.edu.co
 - P3: NOMBRE APELLIDO - CODIGO - correo@correounivalle.edu.co
 - P4: NOMBRE APELLIDO - CODIGO - correo@correounivalle.edu.co
