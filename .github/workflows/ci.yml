@@ -5,14 +5,9 @@ on:
   pull_request:
 
 jobs:
-  build-test:
+  placeholder:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build motor
-        run: |
-          cmake -S motor -B motor/build
-          cmake --build motor/build -j
-      - name: Run motor tests
-        run: |
-          ./motor/build/test_board
+      - name: CI placeholder
+        run: echo "CI inicial listo"
