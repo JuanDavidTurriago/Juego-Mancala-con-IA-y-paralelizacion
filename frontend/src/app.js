@@ -15,6 +15,18 @@ async function ping() {
   }
 }
 
+function renderResult(data) {
+  document.getElementById("resultMove").textContent = data.move ?? "-";
+  document.getElementById("resultEvaluation").textContent = data.evaluation ?? "-";
+  document.getElementById("resultElapsed").textContent = `${data.elapsed_ms ?? "-"} ms`;
+
+  const stats = data.stats || {};
+  document.getElementById("resultAlgo").textContent = stats.algo ?? "-";
+  document.getElementById("resultNodes").textContent = stats.nodes ?? "-";
+  document.getElementById("resultPrunes").textContent = stats.prunes ?? "-";
+  document.getElementById("resultThreads").textContent = stats.threads_used ?? "-";
+}
+
 async function doMove() {
   const out = document.getElementById("out");
   out.textContent = "Procesando...";
@@ -37,6 +49,7 @@ async function doMove() {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+    renderResult(data);
     out.textContent = JSON.stringify(data, null, 2);
   } catch (e) {
     out.textContent = `Error: ${e.message}`;
