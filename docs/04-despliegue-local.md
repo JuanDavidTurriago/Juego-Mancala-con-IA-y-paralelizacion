@@ -2,94 +2,143 @@
 
 ## Docker Compose
 
-Pendiente por completar.
+Esta es la forma recomendada para correr el proyecto completo en local mientras el motor real sigue en desarrollo. El archivo [deploy/local/docker-compose.yml](../deploy/local/docker-compose.yml) levanta tres servicios:
+
+Importante: no existe un `docker-compose.yml` en la raiz del repositorio. El comando correcto siempre debe apuntar a `deploy/local/docker-compose.yml`.
+
+- `motor`: el contenedor del motor C++/OpenMP.
+- `backend`: FastAPI con CORS y validacion del board.
+- `frontend`: cliente web estatico servido por nginx.
+
+### Flujo general
+
+1. Docker construye las tres imagenes.
+2. El motor levanta primero.
+3. El backend arranca con FastAPI y responde usando el mock del motor.
+4. El frontend se sirve en `http://localhost:8080` y consume el backend en `http://localhost:8000`.
+
+### Guia copiar y pegar en PowerShell
+
+#### A. Levantar todo el proyecto
+
+```powershell
+cd C:\Users\andre\OneDrive\Documentos\infra\Juego-Mancala-con-IA-y-paralelizacion
+docker compose -f deploy/local/docker-compose.yml up --build
+```
+
+Cuando termine de construir y arrancar, abre:
+
+- Frontend: `http://localhost:8080`
+- Backend: `http://localhost:8000/healthz`
+- Swagger UI: `http://localhost:8000/docs`
+
+#### B. Verificar el backend desde PowerShell
+
+```powershell
+curl http://localhost:8000/healthz
+```
+
+Respuesta esperada:
+
+```json
+{"status":"ok"}
+```
+
+Prueba del endpoint `POST /move` con un board valido:
+
+```powershell
+$body = @{ board = @(4,4,4,4,4,4,0,4,4,4,4,4,4,0); side = 0; algo = 'alphabeta'; depth = 8; threads = 4 } | ConvertTo-Json -Compress
+Invoke-RestMethod -Uri http://localhost:8000/move -Method Post -ContentType 'application/json' -Body $body
+```
+
+Prueba de validacion con un board invalido de 13 elementos:
+
+```powershell
+$bad = @{ board = @(4,4,4,4,4,4,0,4,4,4,4,4,4); side = 0; algo = 'alphabeta'; depth = 8; threads = 4 } | ConvertTo-Json -Compress
+Invoke-WebRequest -Uri http://localhost:8000/move -Method Post -ContentType 'application/json' -Body $bad
+```
+
+En PowerShell, este comando lanza una excepcion porque el backend responde `422 Unprocessable Entity`. Eso es lo esperado y confirma que la validacion del schema esta funcionando.
+
+Si quieres ver solo el codigo de estado sin que PowerShell interrumpa la ejecucion, usa este comando:
+
+```powershell
+try {
+	Invoke-WebRequest -Uri http://localhost:8000/move -Method Post -ContentType 'application/json' -Body $bad
+} catch {
+	$_.Exception.Response.StatusCode.value__
+}
+```
+
+La salida esperada es `422`.
+
+#### C. Detener el stack
+
+```powershell
+docker compose -f deploy/local/docker-compose.yml down
+```
+
+### Opcion backend manual
+
+Si quieres depurar solo la API sin contenedores, entra a `backend/` y ejecuta:
+
+```powershell
+cd C:\Users\andre\OneDrive\Documentos\infra\Juego-Mancala-con-IA-y-paralelizacion\backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+Esta opcion deja la API corriendo directamente en la maquina, util para revisar errores de validacion o probar `/docs` sin levantar el resto del stack.
 
 ## Kubernetes Local (kind / minikube / k3d)
 
-En esta fase se pide dejar listo un cluster Kubernetes local con kind. kind significa Kubernetes in Docker: crea un cluster de Kubernetes usando contenedores Docker, asi que no necesitas una instalacion pesada de Kubernetes real en la maquina.
+En esta fase se pide dejar listo un cluster Kubernetes local con kind. kind significa Kubernetes in Docker: crea un cluster usando contenedores Docker, asi que no necesitas una instalacion pesada de Kubernetes real en la maquina.
 
 Sirve para probar los manifiestos de `deploy/local/` antes de ir a la nube y para validar que backend, frontend y motor levantan dentro de Kubernetes.
 
-### Instalacion de kind
+### Guia copiar y pegar en PowerShell
 
-1. Instalar Docker Desktop y verificar que este corriendo.
-2. Instalar `kind`.
-3. Instalar `kubectl`.
-4. Crear el cluster local.
-
-Pasos exactos (PowerShell). Ejecuta cada bloque por separado en PowerShell con privilegios de usuario regular (no es necesario elevar):
-
-1) Asegúrate de que Docker Desktop está instalado y en ejecución.
+#### A. Verificar Docker Desktop
 
 ```powershell
-# Verifica que Docker esté running
 docker version
 docker info
 ```
 
-2) Instala `kind` y `kubectl` (winget):
+Si estos comandos fallan, primero abre Docker Desktop y espera a que termine de iniciar.
+
+#### B. Instalar kind y kubectl
 
 ```powershell
 winget install Kubernetes.kind -e --source winget
 winget install Kubernetes.kubectl -e --source winget
 ```
 
-3) Crea el cluster local con kind:
+#### C. Crear el cluster local
 
 ```powershell
 kind create cluster --name mancala-local
 ```
 
-4) Verifica el estado del cluster y el nodo:
+Si aparece el error `node(s) already exist for a cluster with the name "mancala-local"`, significa que el cluster ya fue creado antes. En ese caso no lo vuelvas a crear: sigue con el paso D y reutiliza el cluster existente.
+
+#### D. Verificar que el cluster quedo listo
 
 ```powershell
 kubectl cluster-info --context kind-mancala-local
 kubectl get nodes
 ```
 
-5) Aplica los manifiestos del proyecto (desde la raíz del repo):
+#### E. Construir las imagenes del proyecto
 
 ```powershell
-kubectl apply -f deploy/local/
-```
-
-6) Comprueba pods y servicios:
-
-```powershell
-kubectl get pods -A
-kubectl get svc -A
-```
-
-Qué deberías ver (resumen rápido):
-
-- `kind create cluster` termina con mensaje de creación y el contexto `kind-mancala-local` se añade a kubectl.
-- `kubectl get nodes` muestra al menos un nodo en estado `Ready`.
-- `kubectl get pods -A` muestra los pods del `motor`, `backend` y `frontend` arrancando o en `Running`.
-- `kubectl get svc -A` lista los servicios creados (puedes usar `kubectl port-forward` o `NodePort` según los manifiestos para acceder a la app).
-
-### Uso basico
-
-```powershell
-kubectl apply -f deploy/local/
-kubectl get pods
-kubectl get svc
-```
-
-Si prefieren, tambien se puede usar minikube o k3d, pero kind suele ser la opcion mas simple para un cluster local reproducible.
-
-### Construir, cargar y desplegar (comandos copy/paste)
-
-Estos son los pasos que hemos seguido y que puedes ejecutar manualmente en PowerShell desde la raíz del repo. También hay un script automático `scripts/deploy-kind.ps1` que hace lo mismo.
-
-1) Construir imágenes:
-
-```powershell
+cd C:\Users\andre\OneDrive\Documentos\infra\Juego-Mancala-con-IA-y-paralelizacion
 docker build -t backend:local ./backend
 docker build -t frontend:local ./frontend
 docker build -t motor:local ./motor
 ```
 
-2) Cargar imágenes en kind (cluster `mancala-local`):
+#### F. Cargar las imagenes en kind
 
 ```powershell
 kind load docker-image backend:local --name mancala-local
@@ -97,7 +146,21 @@ kind load docker-image frontend:local --name mancala-local
 kind load docker-image motor:local --name mancala-local
 ```
 
-3) Reiniciar despliegues (forzar que usen la imagen local cargada):
+#### G. Aplicar los manifiestos de Kubernetes
+
+```powershell
+kubectl apply -f deploy/local/backend-deployment.yaml
+kubectl apply -f deploy/local/backend-service.yaml
+kubectl apply -f deploy/local/configmap.yaml
+kubectl apply -f deploy/local/frontend-deployment.yaml
+kubectl apply -f deploy/local/frontend-service.yaml
+kubectl apply -f deploy/local/motor-deployment.yaml
+kubectl apply -f deploy/local/motor-service.yaml
+```
+
+No uses `kubectl apply -f deploy/local/` porque esa carpeta tambien contiene `docker-compose.yml`, y ese archivo no es un manifiesto de Kubernetes. Si apuntas al directorio completo, `kubectl` intenta leer el compose y falla con `apiVersion not set` y `kind not set`.
+
+#### H. Forzar que los deployments usen las imagenes locales
 
 ```powershell
 kubectl rollout restart deployment/backend
@@ -105,45 +168,65 @@ kubectl rollout restart deployment/frontend
 kubectl rollout restart deployment/motor
 ```
 
-4) Verificar estado:
+#### I. Verificar el estado del cluster
 
 ```powershell
 kubectl get pods -A
 kubectl get svc -A
 ```
 
-### Diagnóstico y pasos adicionales (logs / describe / port-forward)
+### Qué deberías ver
 
-Si algún pod no queda en `Running` o aparece `ErrImagePull`/`CrashLoopBackOff`/`Completed`, estos comandos ayudan a diagnosticar:
+- `kind create cluster` termina sin error y crea el contexto `kind-mancala-local`.
+- `kubectl get nodes` muestra al menos un nodo en estado `Ready`.
+- `kubectl get pods -A` muestra los pods de `motor`, `backend` y `frontend` arrancando o en `Running`.
+- `kubectl get svc -A` lista los servicios del proyecto.
+
+### Probar la API dentro de Kubernetes
+
+Si quieres revisar el backend desde tu maquina, usa `port-forward`:
 
 ```powershell
-# Listar y describir pods problemáticos
-kubectl describe pods -l app=backend
-kubectl describe pods -l app=motor
-
-# Obtener logs
-POD_BACKEND=$(kubectl get pods -l app=backend -o jsonpath='{.items[0].metadata.name}')
-kubectl logs $POD_BACKEND -c backend --tail=200
-
-POD_MOTOR=$(kubectl get pods -l app=motor -o jsonpath='{.items[0].metadata.name}')
-kubectl logs $POD_MOTOR --tail=200
-
-# Probar endpoints localmente con port-forward
 kubectl port-forward svc/api-svc 8000:8000
-# luego en otra terminal:
+```
+
+Si ya tienes el backend local corriendo en `http://localhost:8000`, ese puerto quedara ocupado y `port-forward` fallara. En ese caso usa otro puerto local, por ejemplo:
+
+```powershell
+kubectl port-forward svc/api-svc 8001:8000
+```
+
+Luego, en otra ventana de PowerShell:
+
+```powershell
 curl http://localhost:8000/healthz
 curl http://localhost:8000/readyz
 ```
 
+Si usaste `8001:8000`, cambia las pruebas a `http://localhost:8001/healthz` y `http://localhost:8001/readyz`.
+
+### Diagnóstico rápido
+
+Si un pod no queda en `Running` o aparece `ErrImagePull`, `CrashLoopBackOff` o `Completed`, usa esto:
+
+```powershell
+kubectl describe pods -l app=backend
+kubectl describe pods -l app=motor
+kubectl logs (kubectl get pods -l app=backend -o jsonpath='{.items[0].metadata.name}') -c backend --tail=200
+kubectl logs (kubectl get pods -l app=motor -o jsonpath='{.items[0].metadata.name}') --tail=200
+```
+
 ### Script automatizado
 
-Ejecuta el script (desde la raíz del repo) para hacer todo automáticamente:
+Si prefieres no ejecutar todo manualmente, corre el script desde la raíz del repo:
 
 ```powershell
 .\scripts\deploy-kind.ps1
 ```
 
-Breve descripción del script: `scripts/deploy-kind.ps1` automatiza los pasos comunes de desarrollo local: construye las imágenes Docker (`backend`, `frontend`, `motor`), aplica únicamente los manifiestos Kubernetes válidos de `deploy/local/`, carga las imágenes en el cluster `kind` (`mancala-local`), reinicia los deployments para forzar que usen las imágenes locales y muestra el estado y logs básicos para diagnóstico.
+Ese script construye las imagenes Docker, aplica los manifiestos de `deploy/local/`, carga las imagenes en el cluster `kind` llamado `mancala-local`, reinicia los deployments y muestra pods, servicios y logs basicos.
+
+Ademas, valida el stack completo: espera a que backend, frontend y motor queden listos, hace `port-forward` temporal para probar `GET /healthz`, `GET /readyz`, `POST /move` con board valido e invalido, y confirma que el frontend sirve el HTML esperado.
 
 
 

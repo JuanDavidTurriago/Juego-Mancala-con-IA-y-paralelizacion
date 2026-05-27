@@ -97,7 +97,37 @@ pre {
   color: var(--text);
 }
 
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.result-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.result-card span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.result-card strong {
+  font-size: 16px;
+  font-weight: 700;
+}
+
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .result-grid { grid-template-columns: 1fr; }
 }
 

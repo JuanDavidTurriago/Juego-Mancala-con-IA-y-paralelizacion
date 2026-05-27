@@ -34,7 +34,7 @@
           Hilos
           <input id="threads" type="number" value="4" min="1" />
         </label>
-        <button id="btnMove">Calcular jugada</button>
+        <button id="btnMove">Solicitar jugada</button>
       </section>
 
       <section class="panel">
@@ -48,6 +48,36 @@
 
       <section class="panel">
         <h2>Respuesta</h2>
+        <div class="result-grid" aria-label="Resumen de la respuesta">
+          <article class="result-card">
+            <span>Movimiento</span>
+            <strong id="resultMove">-</strong>
+          </article>
+          <article class="result-card">
+            <span>Evaluación</span>
+            <strong id="resultEvaluation">-</strong>
+          </article>
+          <article class="result-card">
+            <span>Tiempo</span>
+            <strong id="resultElapsed">-</strong>
+          </article>
+          <article class="result-card">
+            <span>Algoritmo</span>
+            <strong id="resultAlgo">-</strong>
+          </article>
+          <article class="result-card">
+            <span>Nodos</span>
+            <strong id="resultNodes">-</strong>
+          </article>
+          <article class="result-card">
+            <span>Prunes</span>
+            <strong id="resultPrunes">-</strong>
+          </article>
+          <article class="result-card">
+            <span>Hilos usados</span>
+            <strong id="resultThreads">-</strong>
+          </article>
+        </div>
         <pre id="out"></pre>
       </section>
     </main>
