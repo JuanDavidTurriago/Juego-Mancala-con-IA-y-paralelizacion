@@ -4,12 +4,10 @@ Proyecto final del curso: motores paralelos de Mancala (Kalah) y despliegue en K
 
 ## Integrantes
 
-Reemplace los campos pendientes con la informacion real del grupo:
-
 - P1: Juan David Turriago - 2477182 - juan.turriago@correounivalle.edu.co
-- P2: Javier Andres Muñoz Tavera - 2380 - correo@correounivalle.edu.co
+- P2: Javier Andres Munoz Tavera - 2380 - correo@correounivalle.edu.co
 - P3: Andres Felipe Castrillon Martinez - 2380664 - correo@correounivalle.edu.co
-- P4: Bryan Steven Panesso Avila - 2380701 -BryanPanessocorreo@correounivalle.edu.co
+- P4: Bryan Steven Panesso Avila - 2380701 - bryan.panesso@correounivalle.edu.co
 
 ## Informe
 

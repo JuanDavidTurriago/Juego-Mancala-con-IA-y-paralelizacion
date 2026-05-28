@@ -10,7 +10,7 @@
 
 namespace {
 
-constexpr int kPort = 9000;
+constexpr int kPort = 8080;
 constexpr char kHealthBody[] = "Motor pendiente";
 constexpr size_t kHealthBodyLen = sizeof(kHealthBody) - 1;
 
@@ -38,6 +38,10 @@ bool is_healthz_request(const std::string& request_line) {
   return request_line.rfind("GET /healthz", 0) == 0;
 }
 
+bool is_readyz_request(const std::string& request_line) {
+  return request_line.rfind("GET /readyz", 0) == 0;
+}
+
 void handle_client(int client_fd) {
   char buffer[2048];
   const ssize_t bytes = read(client_fd, buffer, sizeof(buffer) - 1);
@@ -52,8 +56,9 @@ void handle_client(int client_fd) {
   const std::string request_line =
       line_end == std::string::npos ? request : request.substr(0, line_end);
 
-  const std::string response =
-      is_healthz_request(request_line) ? make_health_response() : make_not_found_response();
+  const std::string response = (is_healthz_request(request_line) || is_readyz_request(request_line))
+                                   ? make_health_response()
+                                   : make_not_found_response();
 
   if (write(client_fd, response.c_str(), response.size()) < 0) {
     std::cerr << "write failed: " << std::strerror(errno) << '\n';

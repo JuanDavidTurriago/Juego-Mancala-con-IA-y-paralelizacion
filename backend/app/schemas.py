@@ -27,4 +27,5 @@ class MoveResponse(BaseModel):
     evaluation: float
     elapsed_ms: int
     stats: Dict[str, Any]
+    threads_used: conint(ge=1)
 

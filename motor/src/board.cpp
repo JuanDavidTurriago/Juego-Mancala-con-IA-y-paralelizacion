@@ -69,6 +69,10 @@ int side_pit_sum(const Board& board, int side) {
   return sum;
 }
 
+bool is_terminal_position(const Board& board) {
+  return side_pit_sum(board, 0) == 0 || side_pit_sum(board, 1) == 0;
+}
+
 // Moves all remaining seeds to stores when one side has no regular pit seeds.
 void sweep_remaining_seeds(Board& board) {
   if (side_pit_sum(board, 0) == 0) {
@@ -88,9 +92,7 @@ void sweep_remaining_seeds(Board& board) {
 
 // Returns a copied board with terminal sweep applied when needed.
 Board swept_copy(Board board) {
-  if (is_terminal(board)) {
-    sweep_remaining_seeds(board);
-  }
+  is_terminal(board);
   return board;
 }
 
@@ -184,9 +186,7 @@ Board apply_move(const Board& board, int pit_index, bool& extra_turn) {
     next.side_to_move = 1 - moving_side;
   }
 
-  if (is_terminal(next)) {
-    sweep_remaining_seeds(next);
-  }
+  is_terminal(next);
 
 #ifndef NDEBUG
   int total_seeds = total_seed_count(next);
@@ -197,7 +197,15 @@ Board apply_move(const Board& board, int pit_index, bool& extra_turn) {
 }
 
 bool is_terminal(const Board& board) {
-  return side_pit_sum(board, 0) == 0 || side_pit_sum(board, 1) == 0;
+  return is_terminal_position(board);
+}
+
+bool is_terminal(Board& board) {
+  if (!is_terminal_position(board)) {
+    return false;
+  }
+  sweep_remaining_seeds(board);
+  return true;
 }
 
 int winner(const Board& board) {

@@ -19,7 +19,9 @@ spec:
             - containerPort: 8000
           env:
             - name: MOTOR_URL
-              value: "http://motor-svc:9000"
+              value: "http://motor-svc:8080"
+            - name: MOTOR_USE_MOCK
+              value: "true"
           livenessProbe:
             httpGet:
               path: /healthz
@@ -32,4 +34,10 @@ spec:
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
-
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

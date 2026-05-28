@@ -17,6 +17,18 @@ spec:
           image: REPLACE_ME/frontend:1.0.0
           ports:
             - containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
           resources:
             requests:
               cpu: "100m"
@@ -24,4 +36,3 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-

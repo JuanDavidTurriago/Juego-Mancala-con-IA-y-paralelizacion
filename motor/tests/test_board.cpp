@@ -37,6 +37,12 @@ bool test_initial_state() {
   ok &= expect_true(sum_seeds(board) == 48, "initial seed sum must be 48");
   ok &= expect_true(board.pits[6] == 0, "P1 store must start empty");
   ok &= expect_true(board.pits[13] == 0, "P2 store must start empty");
+  for (int pit = 0; pit <= 5; ++pit) {
+    ok &= expect_true(board.pits[pit] == 4, "P1 pit " + std::to_string(pit) + " must start with 4 seeds");
+  }
+  for (int pit = 7; pit <= 12; ++pit) {
+    ok &= expect_true(board.pits[pit] == 4, "P2 pit " + std::to_string(pit) + " must start with 4 seeds");
+  }
   return ok;
 }
 
@@ -173,4 +179,3 @@ int main() {
   std::cout << passed << "/" << tests.size() << " tests passed\n";
   return passed == static_cast<int>(tests.size()) ? 0 : 1;
 }
-

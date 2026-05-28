@@ -3,10 +3,9 @@
 #include <cassert>
 
 int main() {
-  Board b = Board::Initial();
+  Board b;
   MctsEngine engine;
   auto res = engine.SearchBestMove(b, 10);
-  assert(res.move >= 0 && res.move < Board::kPitsPerSide);
+  assert(res.move >= 0 && res.move <= 5);
   return 0;
 }
-

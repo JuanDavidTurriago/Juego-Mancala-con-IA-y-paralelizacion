@@ -50,8 +50,8 @@ def test_move_mock_response():
             "algo": "alphabeta",
             "nodes": 1845210,
             "prunes": 312083,
-            "threads_used": 4,
         },
+        "threads_used": 4,
     }
 
 

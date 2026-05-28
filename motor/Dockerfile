@@ -1,7 +1,8 @@
 FROM ubuntu:22.04 AS builder
 
+# g++ provides the OpenMP build support for -fopenmp; libgomp1 provides the GCC OpenMP runtime.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake \
+    build-essential cmake g++ libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,5 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=builder /app/build/mancala_server /usr/local/bin/mancala_server
 
-EXPOSE 9000
+ENV OMP_NUM_THREADS=4
+EXPOSE 8080
 CMD ["/usr/local/bin/mancala_server"]

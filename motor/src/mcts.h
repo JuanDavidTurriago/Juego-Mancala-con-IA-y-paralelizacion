@@ -11,7 +11,7 @@ struct MctsStats {
 };
 
 struct MctsResult {
-  int move = -1;          // 0..5 (relative)
+  int move = -1;          // absolute pit index
   double evaluation = 0;  // win_rate estimate [0..1]
   MctsStats stats{};
 };
@@ -25,4 +25,3 @@ class MctsEngine {
  private:
   double exploration_c_ = 1.41421356237;
 };
-
