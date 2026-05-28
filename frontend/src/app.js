@@ -24,7 +24,7 @@ function renderResult(data) {
   document.getElementById("resultAlgo").textContent = stats.algo ?? "-";
   document.getElementById("resultNodes").textContent = stats.nodes ?? "-";
   document.getElementById("resultPrunes").textContent = stats.prunes ?? "-";
-  document.getElementById("resultThreads").textContent = stats.threads_used ?? "-";
+  document.getElementById("resultThreads").textContent = data.threads_used ?? "-";
 }
 
 async function doMove() {

@@ -10,7 +10,7 @@ struct AlphaBetaStats {
 };
 
 struct AlphaBetaResult {
-  int move = -1;          // 0..5 (relative)
+  int move = -1;          // absolute pit index
   int evaluation = 0;     // heuristic score from current player POV
   AlphaBetaStats stats{};
 };
@@ -27,4 +27,3 @@ class AlphaBetaEngine {
   int Evaluate(const Board& board, int pov_side) const;
   int Negamax(Board board, int depth, int alpha, int beta, int pov_side, AlphaBetaStats& stats);
 };
-

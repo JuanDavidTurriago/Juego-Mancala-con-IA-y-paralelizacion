@@ -17,12 +17,14 @@ target_include_directories(mancala PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_executable(test_board tests/test_board.cpp)
 target_link_libraries(test_board PRIVATE mancala)
 
-if(MANCALA_BUILD_SEARCH)
+if(MANCALA_BUILD_SEARCH OR MANCALA_BUILD_BENCH)
   target_sources(mancala PRIVATE
     src/alphabeta.cpp
     src/mcts.cpp
   )
+endif()
 
+if(MANCALA_BUILD_SEARCH)
   add_executable(test_alphabeta tests/test_alphabeta.cpp)
   target_link_libraries(test_alphabeta PRIVATE mancala)
 

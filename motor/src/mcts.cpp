@@ -10,11 +10,10 @@ MctsResult MctsEngine::SearchBestMove(const Board& board, int simulations) {
   MctsResult result;
   result.stats.rollouts = simulations;
 
-  auto moves = board.LegalMoves(board.side_to_move());
+  auto moves = legal_moves(board);
   if (!moves.empty()) result.move = moves.front();
   result.evaluation = 0.0;
   result.stats.win_rate = 0.0;
   result.stats.tree_depth_avg = 0.0;
   return result;
 }
-

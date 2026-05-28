@@ -16,5 +16,29 @@ spec:
         - name: motor
           image: motor:local
           ports:
-            - containerPort: 9000
-
+            - containerPort: 8080
+          env:
+            - name: OMP_NUM_THREADS
+              valueFrom:
+                configMapKeyRef:
+                  name: mancala-config
+                  key: OMP_NUM_THREADS
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
