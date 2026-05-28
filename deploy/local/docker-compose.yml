@@ -5,6 +5,14 @@ services:
       - "9000:9000"
     environment:
       OMP_NUM_THREADS: "4"
+    networks:
+      - mancala
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000 && printf \"GET /healthz HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q Motor <<< $$(cat <&3)'"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   backend:
     build: ../../backend
@@ -13,12 +21,27 @@ services:
     environment:
       MOTOR_URL: "http://motor:9000"
     depends_on:
-      - motor
+      motor:
+        condition: service_healthy
+    networks:
+      - mancala
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   frontend:
     build: ../../frontend
     ports:
       - "8080:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - mancala
 
+networks:
+  mancala:
+    driver: bridge
