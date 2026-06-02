@@ -1,0 +1,13 @@
+# 08 - Conclusiones
+
+El proyecto quedo organizado como una solucion distribuida y reproducible. La plantilla del profesor se mantiene como fuente de verdad y la implementacion se ubica dentro de las carpetas evaluables: `motor`, `backend`, `frontend`, `deploy` y `docs`. La migracion desde el repositorio anterior aprovecho las reglas de tablero y parte de la estructura FastAPI, pero elimino el camino simulado como comportamiento principal y completo el servidor C++ real para `POST /move`.
+
+El motor implementa Kalah(6,4) con las reglas centrales: distribucion de semillas, salto del store rival, turno extra, captura y barrido de final de partida. La busqueda Alfa-Beta reporta nodos y podas, y OpenMP se usa en la raiz del arbol para repartir movimientos candidatos entre hilos. Esta estrategia no es la mas sofisticada posible, pero es clara, medible y facil de defender: cada rama raiz es independiente y el resultado paralelo se compara contra la ejecucion secuencial.
+
+El backend cumple su papel de frontera HTTP. Valida con Pydantic, configura CORS con origenes explicitos, expone health/readiness/metrics y delega por red al motor. Si el motor no responde, el backend no oculta la falla; devuelve readiness negativa o error `503`. Esto es importante porque el requisito del proyecto no era construir una API aislada, sino conectar servicios.
+
+El despliegue local queda cubierto por Docker Compose y por manifiestos Kubernetes locales. El despliegue de nube declara replicas, Services, ConfigMap, probes, recursos e Ingress. Las imagenes usan tags versionados y el workflow propio construye, prueba y publica artefactos. `classroom.yml` no se modifico, de modo que el autograding del profesor sigue separado del CI del grupo.
+
+Los limites tambien son claros. El servidor HTTP del motor es intencionalmente minimo y no reemplaza un framework de produccion. El paralelismo de raiz puede perder eficiencia con mas hilos que movimientos legales, y puede explorar mas nodos que una version secuencial por no compartir cotas globales de forma agresiva. El analisis comparativo debe reconocer esos efectos y usar el benchmark para medir tendencias reales.
+
+Como trabajo futuro, el motor podria incorporar ordenamiento de movimientos, iterative deepening, tabla de transposicion y una estrategia paralela mas avanzada como YBWC. El backend podria agregar autenticacion y limites por cliente. La nube podria automatizar el despliegue con un ambiente protegido en GitHub Actions. Aun sin esas extensiones, la entrega actual cubre el ciclo completo pedido: motor C++/OpenMP, backend FastAPI, frontend web, Docker Compose, Kubernetes local/nube, CI/CD y documentacion.

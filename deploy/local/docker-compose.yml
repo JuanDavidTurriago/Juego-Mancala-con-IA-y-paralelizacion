@@ -1,0 +1,43 @@
+services:
+  motor:
+    build:
+      context: ../../motor
+    environment:
+      MOTOR_PORT: "9000"
+      OMP_NUM_THREADS: "4"
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    build:
+      context: ../../backend
+    ports:
+      - "8000:8000"
+    environment:
+      MOTOR_URL: "http://motor:9000"
+      MOTOR_TIMEOUT_SECONDS: "10"
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
+    depends_on:
+      motor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ../../frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy

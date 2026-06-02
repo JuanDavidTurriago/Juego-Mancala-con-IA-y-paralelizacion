@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: motor
+  labels:
+    app: motor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: motor
+  template:
+    metadata:
+      labels:
+        app: motor
+    spec:
+      containers:
+        - name: motor
+          image: mancala-motor:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9000
+          envFrom:
+            - configMapRef:
+                name: mancala-config
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+            limits:
+              cpu: "2000m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: motor
+spec:
+  selector:
+    app: motor
+  ports:
+    - name: http
+      port: 9000
+      targetPort: 9000
+  type: ClusterIP

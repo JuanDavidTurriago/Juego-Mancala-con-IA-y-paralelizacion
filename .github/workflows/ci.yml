@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  motor:
+    name: Motor C++ OpenMP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libgomp1
+      - name: Configure
+        run: cmake -S motor -B motor/build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build motor/build -j
+      - name: Test
+        run: ctest --test-dir motor/build --output-on-failure
+      - name: Benchmark smoke test
+        run: ./motor/build/mancala_bench --depth 4 --positions motor/tests/suite.txt --threads 1,2
+
+  backend:
+    name: Backend FastAPI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Test
+        run: pytest backend/tests
+
+  docker:
+    name: Build container images
+    runs-on: ubuntu-latest
+    needs: [motor, backend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build motor image
+        run: docker build -t mancala-motor:${{ github.sha }} motor
+      - name: Build backend image
+        run: docker build -t mancala-backend:${{ github.sha }} backend
+      - name: Build frontend image
+        run: docker build -t mancala-frontend:${{ github.sha }} frontend
+
+  publish:
+    name: Publish GHCR images
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lowercase owner
+        id: vars
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push motor
+        uses: docker/build-push-action@v6
+        with:
+          context: motor
+          push: true
+          tags: ghcr.io/${{ steps.vars.outputs.owner }}/mancala-motor:${{ github.sha }}
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ghcr.io/${{ steps.vars.outputs.owner }}/mancala-backend:${{ github.sha }}
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: ghcr.io/${{ steps.vars.outputs.owner }}/mancala-frontend:${{ github.sha }}
+
+  sonar:
+    name: SonarQube analysis
+    runs-on: ubuntu-latest
+    needs: [motor, backend]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run SonarQube scanner when configured
+        uses: SonarSource/sonarqube-scan-action@v5
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}

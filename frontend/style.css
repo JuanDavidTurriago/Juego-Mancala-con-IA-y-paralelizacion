@@ -1,0 +1,269 @@
+:root {
+  --bg: #f4f7fb;
+  --ink: #152033;
+  --muted: #64748b;
+  --line: #cbd5e1;
+  --panel: #ffffff;
+  --pit: #e6f0e7;
+  --pit-border: #7aa17d;
+  --store: #f5d5a3;
+  --store-border: #b7833f;
+  --accent: #2563eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.topbar p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--muted);
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.status.is-ok {
+  color: #166534;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.2fr) minmax(280px, 0.8fr);
+  gap: 16px;
+  width: min(1180px, calc(100vw - 32px));
+  margin: 16px auto;
+}
+
+.board-panel,
+.controls,
+.result {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.board-panel {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  grid-template-rows: repeat(2, minmax(92px, auto));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.pit-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(46px, 1fr));
+  gap: 10px;
+}
+
+.pit-row-top {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.pit-row-bottom {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.pit,
+.store {
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--pit-border);
+  background: var(--pit);
+  min-height: 82px;
+}
+
+.pit {
+  cursor: pointer;
+}
+
+.pit:hover {
+  outline: 3px solid rgba(37, 99, 235, 0.18);
+}
+
+.pit span,
+.store span,
+.metric span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pit strong,
+.store strong {
+  font-size: 28px;
+}
+
+.store {
+  min-height: 186px;
+  background: var(--store);
+  border-color: var(--store-border);
+}
+
+.store-p1 {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.store-p0 {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+.controls {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+textarea,
+select,
+input,
+button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+}
+
+textarea {
+  min-height: 112px;
+  resize: vertical;
+  font-family: Consolas, "Liberation Mono", monospace;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.result {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 74px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
+}
+
+pre {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px;
+  min-height: 100px;
+  white-space: pre-wrap;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .board-panel {
+    grid-template-columns: 70px 1fr 70px;
+  }
+
+  .pit-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .store {
+    min-height: 100%;
+  }
+
+  .result {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .board-panel,
+  .result,
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .store-p1,
+  .store-p0,
+  .pit-row-top,
+  .pit-row-bottom {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}

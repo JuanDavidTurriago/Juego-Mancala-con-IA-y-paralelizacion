@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mancala Kalah</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Mancala Kalah(6,4)</h1>
+      </div>
+      <span id="status" class="status">API: checking</span>
+    </header>
+
+    <main class="shell">
+      <section class="board-panel" aria-label="Tablero Mancala">
+        <div class="store store-p1">
+          <span>Store P1</span>
+          <strong id="store1">0</strong>
+        </div>
+        <div class="pit-row pit-row-top" id="topRow"></div>
+        <div class="pit-row pit-row-bottom" id="bottomRow"></div>
+        <div class="store store-p0">
+          <span>Store P0</span>
+          <strong id="store0">0</strong>
+        </div>
+      </section>
+
+      <section class="controls">
+        <label>
+          Board JSON
+          <textarea id="board" spellcheck="false">[4,4,4,4,4,4,0,4,4,4,4,4,4,0]</textarea>
+        </label>
+        <div class="field-grid">
+          <label>
+            Side
+            <select id="side">
+              <option value="0">0</option>
+              <option value="1">1</option>
+            </select>
+          </label>
+          <label>
+            Depth
+            <input id="depth" type="number" value="8" min="1" max="32" />
+          </label>
+          <label>
+            Threads
+            <input id="threads" type="number" value="4" min="1" max="64" />
+          </label>
+        </div>
+        <button id="btnMove" type="button">Calcular jugada</button>
+      </section>
+
+      <section class="result">
+        <div class="metric">
+          <span>Move</span>
+          <strong id="resultMove">-</strong>
+        </div>
+        <div class="metric">
+          <span>Evaluation</span>
+          <strong id="resultEvaluation">-</strong>
+        </div>
+        <div class="metric">
+          <span>Elapsed</span>
+          <strong id="resultElapsed">-</strong>
+        </div>
+        <div class="metric">
+          <span>Nodes</span>
+          <strong id="resultNodes">-</strong>
+        </div>
+        <div class="metric">
+          <span>Prunes</span>
+          <strong id="resultPrunes">-</strong>
+        </div>
+        <div class="metric">
+          <span>Threads</span>
+          <strong id="resultThreads">-</strong>
+        </div>
+        <pre id="out"></pre>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

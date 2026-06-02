@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mancala-config
+data:
+  MOTOR_URL: "http://motor:9000"
+  MOTOR_TIMEOUT_SECONDS: "10"
+  CORS_ORIGINS: "https://mancala.example.edu.co"
+  MOTOR_PORT: "9000"
+  OMP_NUM_THREADS: "4"

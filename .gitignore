@@ -1,0 +1,96 @@
+# ---- Compilados y binarios ----
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.a
+*.lib
+*.class
+*.jar
+
+# ---- Carpetas de build ----
+build/
+dist/
+out/
+bin/
+target/
+cmake-build-*/
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / frontend ----
+node_modules/
+.npm/
+.next/
+.parcel-cache/
+.cache/
+.yarn/
+
+# ---- LaTeX (por si alguien compila informes que no se entregan) ----
+*.aux
+*.log
+*.toc
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.pdf
+_minted-*/
+_minted/
+
+# ---- IDE / editor ----
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- Kubernetes y entornos locales ----
+kubeconfig
+*.kubeconfig
+.kube/
+*.local.yaml
+.minikube/
+.kind/
+
+# ---- Secrets y configuración local ----
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+
+# ---- Datos pesados generados por experimentos ----
+results/
+benchmarks/raw/
+profiling/
+*.perf.data
+perf.data*
+callgrind.out.*
+
+# ---- Tests temporales ----
+tmp/
+temp/
+*.tmp
