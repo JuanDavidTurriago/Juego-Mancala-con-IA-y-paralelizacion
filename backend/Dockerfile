@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY app ./app
 
-ENV MOTOR_URL=http://motor:9000
+ENV MOTOR_URL=http://motor:8080
 ENV MOTOR_TIMEOUT_SECONDS=10
 ENV CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
 

@@ -3,12 +3,12 @@ services:
     build:
       context: ../../motor
     environment:
-      MOTOR_PORT: "9000"
+      MOTOR_PORT: "8080"
       OMP_NUM_THREADS: "4"
     ports:
-      - "9000:9000"
+      - "9000:8080"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -20,7 +20,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MOTOR_URL: "http://motor:9000"
+      MOTOR_URL: "http://motor:8080"
       MOTOR_TIMEOUT_SECONDS: "10"
       CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
     depends_on:
