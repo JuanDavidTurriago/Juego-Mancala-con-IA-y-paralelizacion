@@ -26,8 +26,13 @@ jobs:
         run: ./motor/build/test_board
       - name: Run test_alphabeta
         run: ./motor/build/test_alphabeta
+      - name: Run test_mcts
+        working-directory: motor/tests
+        run: ../build/test_mcts
       - name: Benchmark smoke test
-        run: ./motor/build/mancala_bench --depth 4 --positions motor/tests/suite.txt --threads 1,2
+        run: ./motor/build/bench --algo alphabeta --depth 4 --positions motor/tests/suite.txt
+      - name: MCTS benchmark smoke test
+        run: ./motor/build/bench --algo mcts --simulations 100 --positions motor/tests/suite.txt
 
   backend:
     name: Backend FastAPI

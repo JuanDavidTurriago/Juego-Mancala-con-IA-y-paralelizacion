@@ -8,13 +8,14 @@ La separacion es importante. `classroom.yml` pertenece al profesor y no debe mod
 
 ## Job del motor
 
-El job `motor` corre en Ubuntu. Instala `cmake`, `g++` y `libgomp1`, configura CMake en modo Release, compila y ejecuta los ejecutables de prueba `test_board` y `test_alphabeta` (reglas del tablero y busqueda Alfa-Beta). Despues ejecuta un benchmark de humo:
+El job `motor` corre en Ubuntu. Instala `cmake`, `g++` y `libgomp1`, configura CMake en modo Release, compila y ejecuta los ejecutables de prueba `test_board`, `test_alphabeta` y `test_mcts` (reglas del tablero, busqueda Alfa-Beta y MCTS). Despues ejecuta un benchmark de humo:
 
 ```bash
-./motor/build/mancala_bench --depth 4 --positions motor/tests/suite.txt --threads 1,2
+./motor/build/bench --algo alphabeta --depth 4 --positions motor/tests/suite.txt
+./motor/build/bench --algo mcts --simulations 100 --positions motor/tests/suite.txt
 ```
 
-La profundidad 4 es deliberadamente pequena para CI. No busca medir rendimiento definitivo; busca confirmar que el benchmark compila, lee posiciones, ejecuta OpenMP y produce salida CSV sin bloquear el pipeline. Las mediciones formales se hacen manualmente con profundidades mayores.
+La profundidad 4 y las 100 simulaciones de MCTS son deliberadamente pequenas para CI. No buscan medir rendimiento definitivo; buscan confirmar que el benchmark compila, lee posiciones, ejecuta ambos algoritmos y produce tablas sin bloquear el pipeline. Las mediciones formales se hacen manualmente con profundidades y presupuestos mayores.
 
 ## Job del backend
 

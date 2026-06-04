@@ -1,4 +1,4 @@
-#include "board.h"
+#include "../src/board.h"
 
 #include <iostream>
 #include <string>
@@ -8,7 +8,9 @@ namespace {
 
 Board empty_board(int side_to_move = 0) {
   Board board;
-  board.pits.fill(0);
+  for (int i = 0; i < kBoardSize; ++i) {
+    board.pits[i] = 0;
+  }
   board.side_to_move = side_to_move;
   return board;
 }
@@ -120,6 +122,29 @@ bool test_game_end_and_sweep() {
   return ok;
 }
 
+bool test_no_capture_when_opposite_empty() {
+  Board board = empty_board(0);
+  board.pits[2] = 1;
+  board.pits[6] = 10;
+  board.pits[7] = 5;
+  board.pits[8] = 5;
+  board.pits[9] = 0;
+  board.pits[10] = 5;
+  board.pits[11] = 5;
+  board.pits[12] = 5;
+  board.pits[13] = 12;
+
+  bool extra_turn = false;
+  Board next = apply_move(board, 2, extra_turn);
+  bool ok = true;
+  ok &= expect_true(!extra_turn, "move should not grant extra turn");
+  ok &= expect_true(next.pits[3] == 1, "landing pit keeps the seed when opposite is empty");
+  ok &= expect_true(next.pits[9] == 0, "opposite pit remains empty");
+  ok &= expect_true(next.pits[6] == 10, "store is unchanged without capture");
+  ok &= expect_true(total_seed_count(next) == 48, "seed sum remains 48");
+  return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -130,6 +155,7 @@ int main() {
       {"skip_opponent_store", test_skip_opponent_store},
       {"successful_capture", test_successful_capture},
       {"game_end_and_sweep", test_game_end_and_sweep},
+      {"no_capture_when_opposite_empty", test_no_capture_when_opposite_empty},
   };
 
   int passed = 0;

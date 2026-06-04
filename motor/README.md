@@ -1,19 +1,27 @@
 # motor/
 
-Contenedor 1 — motor de búsqueda C++ con OpenMP.
+Contenedor 1: motor de busqueda C++17 con OpenMP.
 
-Subdirectorios obligatorios:
+Subdirectorios principales:
 
-- `src/` — código fuente C++ del motor (Minimax con poda Alfa--Beta).
-- `tests/` — pruebas unitarias del motor.
-- `bench/` — modo `benchmark`: ejecutable que lee posiciones fijas desde
-  un archivo, mide tiempo, *speedup* y eficiencia, y reporta tablas.
+- `src/`: codigo fuente C++ del motor, incluyendo tablero, Alpha-Beta y MCTS.
+- `tests/`: pruebas unitarias del motor.
+- `bench/`: ejecutable de benchmark que lee posiciones fijas desde `suite.txt`,
+  mide tiempo, speedup, eficiencia, nodos y podas.
 
-Archivo en la raíz del directorio:
+Archivos de la raiz:
 
-- `Dockerfile` — imagen del motor. Expone un *endpoint* interno
-  (HTTP/gRPC) consumible por el `backend`.
+- `CMakeLists.txt`: build local y targets de pruebas.
+- `Dockerfile`: imagen del motor. Expone un endpoint HTTP interno consumible por
+  el backend.
+- `motor_server`: binario HTTP generado por CMake; escucha en `0.0.0.0:8080`.
 
-El motor **no** se enlaza al backend en el mismo proceso
-(`pybind11`/`ctypes`): la separación se hace a nivel de contenedor y la
-comunicación va por la red interna del clúster.
+Contrato de `POST /move`:
+
+- `algo="alphabeta"` requiere `depth` y puede usar varios hilos con OpenMP.
+- `algo="mcts"` requiere `simulations`; la version actual de MCTS es secuencial
+  y reporta `threads_used=1`.
+
+El motor no se enlaza al backend en el mismo proceso (`pybind11`/`ctypes`).
+La separacion se hace a nivel de contenedor y la comunicacion usa HTTP dentro de
+la red interna del despliegue.

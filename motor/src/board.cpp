@@ -1,6 +1,8 @@
 #include "board.h"
 
 #include <cassert>
+#include <climits>
+#include <iostream>
 
 namespace {
 
@@ -44,7 +46,29 @@ Board::Board()
       side_to_move(0) {}
 
 bool Board::operator==(const Board& other) const {
-  return pits == other.pits && side_to_move == other.side_to_move;
+  if (side_to_move != other.side_to_move) {
+    return false;
+  }
+  for (int i = 0; i < kBoardSize; ++i) {
+    if (pits[i] != other.pits[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void Board::display() const {
+  std::cout << "P2: ";
+  for (int pit = 12; pit >= 7; --pit) {
+    std::cout << pits[pit] << ' ';
+  }
+  std::cout << "\nStores P2=" << pits[kPlayer1Store]
+            << " | P1=" << pits[kPlayer0Store] << '\n';
+  std::cout << "P1: ";
+  for (int pit = 0; pit <= 5; ++pit) {
+    std::cout << pits[pit] << ' ';
+  }
+  std::cout << "\nSide to move: P" << (side_to_move + 1) << '\n';
 }
 
 bool is_valid_side(int side) {
@@ -179,10 +203,10 @@ int evaluate(const Board& board, float pit_weight) {
   if (is_terminal(board)) {
     const int final_winner = winner(board);
     if (final_winner == 0) {
-      return 1000000 + board.pits[kPlayer0Store] - board.pits[kPlayer1Store];
+      return INT_MAX;
     }
     if (final_winner == 1) {
-      return -1000000 + board.pits[kPlayer0Store] - board.pits[kPlayer1Store];
+      return INT_MIN;
     }
     return 0;
   }

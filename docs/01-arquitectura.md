@@ -2,7 +2,7 @@
 
 ## Vision general
 
-La solucion se organiza como una aplicacion distribuida pequena, formada por tres servicios con responsabilidades separadas. El servicio `motor` es un proceso C++17 independiente que implementa las reglas de Kalah(6,4), ejecuta busqueda Alfa-Beta y usa OpenMP para paralelizar la evaluacion de los movimientos de la raiz. El servicio `backend` es una API FastAPI que valida el contrato publico, aplica CORS explicito y delega el calculo al motor por HTTP dentro de la red del despliegue. El servicio `frontend` es una interfaz web estatica servida por Nginx que permite editar el tablero, escoger jugador, profundidad e hilos, y visualizar la jugada recomendada junto con estadisticas.
+La solucion se organiza como una aplicacion distribuida pequena, formada por tres servicios con responsabilidades separadas. El servicio `motor` es un proceso C++17 independiente que implementa las reglas de Kalah(6,4), ejecuta busqueda Alfa-Beta y MCTS, y usa OpenMP para paralelizar la evaluacion de los movimientos de la raiz en Alpha-Beta. El servicio `backend` es una API FastAPI que valida el contrato publico, aplica CORS explicito y delega el calculo al motor por HTTP dentro de la red del despliegue. El servicio `frontend` es una interfaz web estatica servida por Nginx que permite editar el tablero, escoger jugador, algoritmo, profundidad o simulaciones, hilos, y visualizar la jugada recomendada junto con estadisticas.
 
 Esta separacion es intencional. El motor concentra el costo computacional y puede escalarse, medirse y optimizarse sin mezclarlo con logica web. El backend actua como frontera de entrada para navegadores y clientes externos: valida JSON con Pydantic, traduce errores del motor a codigos HTTP y expone endpoints de salud para Docker, Kubernetes y CI. El frontend no contiene logica de IA; solamente construye solicitudes y presenta respuestas. Asi se evita que una parte de la aplicacion tenga que conocer detalles internos de otra.
 
@@ -17,7 +17,7 @@ flowchart LR
 
 ## Contrato de comunicacion
 
-El contrato principal es `POST /move`. El cliente envia un tablero de 14 posiciones, el lado activo, la profundidad de busqueda y el numero de hilos solicitados. El backend valida que el tablero tenga exactamente 14 enteros no negativos, que el total de semillas sea 48, que `side` sea `0` o `1`, que `depth` este entre `1` y `32`, y que `threads` este entre `1` y `64`. Despues envia el mismo JSON al motor en `MOTOR_URL`.
+El contrato principal es `POST /move`. El cliente envia un tablero de 14 posiciones, el lado activo, el algoritmo (`alphabeta` o `mcts`) y el numero de hilos solicitados. Para Alpha-Beta tambien envia `depth`; para MCTS envia `simulations`. El backend valida que el tablero tenga exactamente 14 enteros no negativos, que el total de semillas sea 48, que `side` sea `0` o `1`, que `depth` este entre `1` y `32` cuando aplica, que `simulations` este entre `1` y `100000` cuando aplica, y que `threads` este entre `1` y `64`. Despues envia el mismo JSON al motor en `MOTOR_URL`.
 
 Ejemplo de entrada:
 
@@ -25,6 +25,7 @@ Ejemplo de entrada:
 {
   "board": [4,4,4,4,4,4,0,4,4,4,4,4,4,0],
   "side": 0,
+  "algo": "alphabeta",
   "depth": 8,
   "threads": 4
 }
@@ -34,16 +35,20 @@ Ejemplo de salida:
 
 ```json
 {
+  "algo": "alphabeta",
   "move": 3,
   "evaluation": 7,
   "elapsed_ms": 124,
   "stats": {
+    "algo": "alphabeta",
     "nodes": 1845210,
     "prunes": 312083
   },
   "threads_used": 4
 }
 ```
+
+Para MCTS, `stats` cambia a `{"algo":"mcts","rollouts":...,"win_rate":...}` y `threads_used` se reporta como `1`, porque el MCTS actual es secuencial.
 
 El campo `move` usa indices absolutos del arreglo canonico. Para jugador 0 los pits legales son `0..5`; para jugador 1 los pits legales son `7..12`. Esta decision reduce ambiguedades entre servicios: todos hablan en la misma representacion.
 
@@ -56,7 +61,7 @@ El backend expone cuatro endpoints minimos:
 - `GET /metrics`: publica metricas de backend y, si esta disponible, concatena metricas del motor.
 - `POST /move`: valida la solicitud y delega el calculo al motor.
 
-El motor expone endpoints equivalentes para que el backend y Kubernetes puedan verificarlo: `GET /healthz`, `GET /readyz`, `GET /metrics` y `POST /move`. El motor no es un modulo importado por Python; es un proceso separado. En Docker Compose, el backend lo alcanza con `http://motor:9000`. En Kubernetes, lo alcanza con el Service interno `motor` por el puerto `9000`.
+El motor expone endpoints equivalentes para que el backend y Kubernetes puedan verificarlo: `GET /healthz`, `GET /readyz`, `GET /metrics` y `POST /move`. El motor no es un modulo importado por Python; es un proceso separado. En Docker Compose, el backend lo alcanza con `http://motor:8080` dentro de la red interna, aunque el host publica ese servicio como `localhost:9000`. En Kubernetes, el backend lo alcanza por el Service interno configurado en cada manifiesto.
 
 ## Decisiones de diseno
 

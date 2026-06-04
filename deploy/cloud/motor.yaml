@@ -19,20 +19,20 @@ spec:
           image: ghcr.io/juandavidturriago/mancala-motor:v1.0.0
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 9000
+            - containerPort: 8080
           envFrom:
             - configMapRef:
                 name: mancala-config
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 9000
+              port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 9000
+              port: 8080
             initialDelaySeconds: 15
             periodSeconds: 20
           resources:
@@ -52,6 +52,6 @@ spec:
     app: motor
   ports:
     - name: http
-      port: 9000
-      targetPort: 9000
+      port: 8080
+      targetPort: 8080
   type: ClusterIP
