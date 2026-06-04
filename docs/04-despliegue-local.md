@@ -195,3 +195,7 @@ kind delete cluster --name mancala
 ```
 
 Estos comandos no eliminan el codigo ni modifican la plantilla; solo limpian procesos y recursos locales.
+
+## Guia de pruebas
+
+Si ademas de desplegar necesitas una lista ordenada de comandos para validar el motor, el backend, el frontend y el flujo completo, revisa [TESTING.md](../TESTING.md).

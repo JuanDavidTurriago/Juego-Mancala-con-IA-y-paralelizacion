@@ -5,6 +5,7 @@ from typing import Iterable
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 
 from .motor_client import MotorClient, MotorUnavailable
 from .schemas import MoveRequest, MoveResponse
@@ -55,27 +56,33 @@ def healthz() -> dict[str, str]:
 
 
 @app.get("/readyz")
-def readyz() -> dict[str, str]:
-    if not motor.is_ready():
+async def readyz() -> dict[str, str]:
+    if not await motor.is_ready():
         raise HTTPException(status_code=503, detail="motor unavailable")
     return {"status": "ready"}
 
 
 @app.post("/move", response_model=MoveResponse)
-def move(req: MoveRequest) -> MoveResponse:
+async def move(req: MoveRequest) -> MoveResponse:
     try:
-        response = motor.move(req)
+        raw_response = await motor.call_motor(req)
     except MotorUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=f"motor unavailable: {exc}") from exc
+
+    try:
+        response = MoveResponse.model_validate(raw_response.model_dump() if hasattr(raw_response, "model_dump") else raw_response)
+    except ValidationError as exc:
+        raise HTTPException(status_code=503, detail="motor response is invalid") from exc
+
     app.state.move_requests_total += 1
     return response
 
 
 @app.get("/metrics")
-def metrics() -> Response:
+async def metrics() -> Response:
     body = "\n".join(_metrics_lines()) + "\n"
     try:
-        body += motor.metrics()
+        body += await motor.metrics()
     except MotorUnavailable:
         body += "mancala_backend_motor_up 0\n"
     else:

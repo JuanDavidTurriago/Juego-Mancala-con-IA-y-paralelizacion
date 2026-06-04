@@ -9,7 +9,9 @@
   <body>
     <header class="topbar">
       <div>
+        <p class="eyebrow">Fase 2</p>
         <h1>Mancala Kalah(6,4)</h1>
+        <p>Tablero interactivo con backend real y respuesta del motor.</p>
       </div>
       <span id="status" class="status">API: checking</span>
     </header>
@@ -17,65 +19,79 @@
     <main class="shell">
       <section class="board-panel" aria-label="Tablero Mancala">
         <div class="store store-p1">
-          <span>Store P1</span>
+          <span>Jugador 1</span>
           <strong id="store1">0</strong>
         </div>
         <div class="pit-row pit-row-top" id="topRow"></div>
         <div class="pit-row pit-row-bottom" id="bottomRow"></div>
         <div class="store store-p0">
-          <span>Store P0</span>
+          <span>Jugador 0</span>
           <strong id="store0">0</strong>
         </div>
       </section>
 
       <section class="controls">
+        <div class="field-grid">
+          <label>
+            Jugador activo
+            <select id="side">
+              <option value="0">Jugador 0</option>
+              <option value="1">Jugador 1</option>
+            </select>
+          </label>
+          <label>
+            Algoritmo
+            <select id="algo">
+              <option value="alphabeta">alphabeta</option>
+              <option value="mcts">mcts</option>
+            </select>
+          </label>
+          <label id="depthGroup">
+            Profundidad
+            <input id="depth" type="number" value="8" min="1" max="32" />
+          </label>
+          <label id="simulationsGroup" class="hidden">
+            Simulaciones
+            <input id="simulations" type="number" value="1000" min="1" max="100000" />
+          </label>
+          <label>
+            Hilos
+            <input id="threads" type="number" value="4" min="1" max="64" />
+          </label>
+        </div>
+
         <label>
           Board JSON
           <textarea id="board" spellcheck="false">[4,4,4,4,4,4,0,4,4,4,4,4,4,0]</textarea>
         </label>
-        <div class="field-grid">
-          <label>
-            Side
-            <select id="side">
-              <option value="0">0</option>
-              <option value="1">1</option>
-            </select>
-          </label>
-          <label>
-            Depth
-            <input id="depth" type="number" value="8" min="1" max="32" />
-          </label>
-          <label>
-            Threads
-            <input id="threads" type="number" value="4" min="1" max="64" />
-          </label>
-        </div>
+
         <button id="btnMove" type="button">Calcular jugada</button>
+        <p id="hint" class="hint">Haz clic en un hoyo del jugador activo para consultar el motor.</p>
       </section>
 
       <section class="result">
         <div class="metric">
-          <span>Move</span>
+          <span>Jugada</span>
           <strong id="resultMove">-</strong>
         </div>
         <div class="metric">
-          <span>Evaluation</span>
+          <span>Evaluación</span>
           <strong id="resultEvaluation">-</strong>
         </div>
         <div class="metric">
-          <span>Elapsed</span>
+          <span>Tiempo</span>
           <strong id="resultElapsed">-</strong>
         </div>
         <div class="metric">
-          <span>Nodes</span>
-          <strong id="resultNodes">-</strong>
+          <span>Algoritmo</span>
+          <strong id="resultAlgo">-</strong>
         </div>
         <div class="metric">
-          <span>Prunes</span>
-          <strong id="resultPrunes">-</strong>
+          <span>Estadísticas</span>
+          <strong id="resultStats">-</strong>
         </div>
         <div class="metric">
-          <span>Threads</span>
+          <span>Hilos</span>
           <strong id="resultThreads">-</strong>
         </div>
         <pre id="out"></pre>

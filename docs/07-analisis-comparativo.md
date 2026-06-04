@@ -35,7 +35,7 @@ Para una tabla de informe se recomienda guardar la salida:
 ./motor/build/mancala_bench --depth 8 --positions motor/tests/suite.txt --threads 1,2,4,8 > bench-depth8.csv
 ```
 
-En Windows con Docker se puede construir la imagen del motor y ejecutar el benchmark dentro del contenedor:
+En Debian 12 o cualquier Linux con Docker se puede construir la imagen del motor y ejecutar el benchmark dentro del contenedor:
 
 ```bash
 docker build -t mancala-motor:bench ./motor
@@ -76,7 +76,7 @@ Para producir resultados confiables se recomienda:
 2. Cerrar aplicaciones pesadas antes del benchmark.
 3. Correr cada configuracion al menos tres veces.
 4. Reportar mediana o promedio, indicando la maquina usada.
-5. No mezclar resultados de host Windows, contenedor Linux y CI como si fueran equivalentes.
+5. No mezclar resultados de host Linux, contenedor Docker y CI como si fueran equivalentes.
 6. Mantener fija la profundidad para todas las comparaciones de una tabla.
 
 La profundidad debe elegirse para que `T(1)` sea medible pero no excesivo. Si `depth=4` tarda menos de un milisegundo, el ruido domina. Si `depth=12` tarda minutos, la experimentacion se vuelve poco practica. Un rango razonable es probar `depth=6`, `depth=8` y, si la maquina lo permite, `depth=10`.

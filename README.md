@@ -92,6 +92,9 @@ xdg-open http://localhost:8080
 Una persona externa al grupo debe poder reproducir el despliegue siguiendo
 únicamente estos pasos.
 
+Para ver comandos detallados de verificación del motor, backend, frontend y
+stack completo, consulte [TESTING.md](TESTING.md).
+
 ---
 
 ## Informe

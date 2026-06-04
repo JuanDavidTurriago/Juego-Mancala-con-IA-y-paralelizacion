@@ -6,6 +6,13 @@ const API_URL = (window.API_URL || defaultApiUrl).replace(/\/+$/, "");
 
 const boardInput = document.getElementById("board");
 const statusEl = document.getElementById("status");
+const algoSelect = document.getElementById("algo");
+const depthGroup = document.getElementById("depthGroup");
+const simulationsGroup = document.getElementById("simulationsGroup");
+const hintEl = document.getElementById("hint");
+
+let lastBoard = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
+let selectedPitIndex = null;
 
 function parseBoard() {
   const value = JSON.parse(boardInput.value);
@@ -18,16 +25,32 @@ function parseBoard() {
   return value;
 }
 
+function activeSide() {
+  return Number(document.getElementById("side").value);
+}
+
 function renderPit(index, seeds) {
   const pit = document.createElement("button");
   pit.className = "pit";
   pit.type = "button";
   pit.dataset.index = String(index);
   pit.innerHTML = `<span>${index}</span><strong>${seeds}</strong>`;
-  pit.addEventListener("click", () => {
-    const side = index <= 5 ? 0 : 1;
-    document.getElementById("side").value = String(side);
-  });
+  const side = index <= 5 ? 0 : index >= 7 && index <= 12 ? 1 : null;
+  const isActivePit = side !== null && side === activeSide();
+  if (isActivePit) {
+    pit.classList.add("is-active");
+    pit.addEventListener("click", () => {
+      document.getElementById("side").value = String(side);
+      selectedPitIndex = index;
+      renderBoard(lastBoard);
+      requestMove();
+    });
+  } else {
+    pit.disabled = true;
+  }
+  if (selectedPitIndex === index) {
+    pit.classList.add("is-selected");
+  }
   return pit;
 }
 
@@ -38,6 +61,7 @@ function renderBoard(board) {
   bottom.innerHTML = "";
   document.getElementById("store0").textContent = board[6];
   document.getElementById("store1").textContent = board[13];
+  lastBoard = board.slice();
 
   for (let index = 12; index >= 7; index -= 1) {
     top.appendChild(renderPit(index, board[index]));
@@ -45,6 +69,22 @@ function renderBoard(board) {
   for (let index = 0; index <= 5; index += 1) {
     bottom.appendChild(renderPit(index, board[index]));
   }
+}
+
+function currentPayload() {
+  const algo = algoSelect.value;
+  const payload = {
+    board: parseBoard(),
+    side: activeSide(),
+    algo,
+    threads: Number(document.getElementById("threads").value),
+  };
+  if (algo === "mcts") {
+    payload.simulations = Number(document.getElementById("simulations").value);
+  } else {
+    payload.depth = Number(document.getElementById("depth").value);
+  }
+  return payload;
 }
 
 async function ping() {
@@ -59,11 +99,17 @@ async function ping() {
 }
 
 function renderResult(data) {
+  document.getElementById("resultAlgo").textContent = data.algo ?? "-";
   document.getElementById("resultMove").textContent = data.move ?? "-";
   document.getElementById("resultEvaluation").textContent = data.evaluation ?? "-";
   document.getElementById("resultElapsed").textContent = `${data.elapsed_ms ?? "-"} ms`;
-  document.getElementById("resultNodes").textContent = data.stats?.nodes ?? "-";
-  document.getElementById("resultPrunes").textContent = data.stats?.prunes ?? "-";
+  if (data.stats?.algo === "mcts") {
+    document.getElementById("resultStats").textContent = `rollouts ${data.stats.rollouts} | win_rate ${(data.stats.win_rate * 100).toFixed(1)}%`;
+  } else if (data.stats?.algo === "alphabeta") {
+    document.getElementById("resultStats").textContent = `nodes ${data.stats.nodes} | prunes ${data.stats.prunes}`;
+  } else {
+    document.getElementById("resultStats").textContent = "-";
+  }
   document.getElementById("resultThreads").textContent = data.threads_used ?? "-";
 }
 
@@ -71,14 +117,8 @@ async function requestMove() {
   const out = document.getElementById("out");
   out.textContent = "Procesando...";
   try {
-    const board = parseBoard();
-    renderBoard(board);
-    const payload = {
-      board,
-      side: Number(document.getElementById("side").value),
-      depth: Number(document.getElementById("depth").value),
-      threads: Number(document.getElementById("threads").value),
-    };
+    const payload = currentPayload();
+    renderBoard(payload.board);
     const response = await fetch(`${API_URL}/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,11 +138,24 @@ async function requestMove() {
 boardInput.addEventListener("input", () => {
   try {
     renderBoard(parseBoard());
+    hintEl.textContent = "Tablero actualizado. Haz clic en un hoyo activo o pulsa Calcular jugada.";
   } catch {
     // Keep the last valid board visible while the user edits JSON.
+    hintEl.textContent = "El JSON del tablero es inválido.";
   }
 });
+algoSelect.addEventListener("change", () => {
+  const isMcts = algoSelect.value === "mcts";
+  depthGroup.classList.toggle("hidden", isMcts);
+  simulationsGroup.classList.toggle("hidden", !isMcts);
+});
 document.getElementById("btnMove").addEventListener("click", requestMove);
+document.getElementById("side").addEventListener("change", () => {
+  selectedPitIndex = null;
+  renderBoard(lastBoard);
+});
+
 renderBoard(JSON.parse(boardInput.value));
+algoSelect.dispatchEvent(new Event("change"));
 ping();
 setInterval(ping, 3000);
