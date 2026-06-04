@@ -78,18 +78,24 @@ Los manifiestos estan en `deploy/local/k8s/`:
 - `backend.yaml`: Deployment con **3 replicas** y Service `backend` (NodePort).
 - `frontend.yaml`: Deployment (2 replicas) y Service `frontend` (NodePort `30080`).
 
-### 1. Cluster e imagenes
+### 1. Cluster e imagenes (GHCR)
 
-Sin cargar las imagenes en kind, los pods quedan en `ImagePullBackOff` porque el cluster no puede descargar tags locales.
+Los Deployments en `deploy/local/k8s/` referencian imágenes publicadas en GHCR con tag **SHA del commit** (sin `:latest`), por ejemplo:
+
+`ghcr.io/juandavidturriago/mancala-motor:6b352e0cc7de763eb2005257b416022c63ef27a1`
+
+El job `publish` de CI solo corre en `push` a `main`; el tag debe coincidir con el commit publicado.
 
 ```bash
 kind create cluster --name mancala
-docker build -t mancala-motor ./motor
-docker build -t mancala-backend ./backend
-docker build -t mancala-frontend ./frontend
-kind load docker-image mancala-motor --name mancala
-kind load docker-image mancala-backend --name mancala
-kind load docker-image mancala-frontend --name mancala
+
+kubectl create secret docker-registry ghcr-credentials \
+  --docker-server=ghcr.io \
+  --docker-username=<GITHUB_USER> \
+  --docker-password=<PAT_con_read:packages>
+
+# Verificar pull desde el host (opcional)
+docker pull ghcr.io/juandavidturriago/mancala-motor:6b352e0cc7de763eb2005257b416022c63ef27a1
 ```
 
 ### 2. Aplicar manifiestos (orden)

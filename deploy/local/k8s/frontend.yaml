@@ -14,10 +14,12 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+        - name: ghcr-credentials
       containers:
         - name: frontend
-          image: mancala-frontend
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/juandavidturriago/mancala-frontend:6b352e0cc7de763eb2005257b416022c63ef27a1
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           readinessProbe:

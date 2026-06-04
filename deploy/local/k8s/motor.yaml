@@ -14,10 +14,12 @@ spec:
       labels:
         app: motor
     spec:
+      imagePullSecrets:
+        - name: ghcr-credentials
       containers:
         - name: motor
-          image: mancala-motor
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/juandavidturriago/mancala-motor:6b352e0cc7de763eb2005257b416022c63ef27a1
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:
