@@ -7,16 +7,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(OpenMP REQUIRED)
 
-add_library(mancala_core
+set(MOTOR_SOURCES
     src/board.cpp
     src/alphabeta.cpp
-    src/mcts.cpp
 )
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/mcts.cpp)
+    list(APPEND MOTOR_SOURCES src/mcts.cpp)
+endif()
+
+add_library(mancala_core ${MOTOR_SOURCES})
 target_include_directories(mancala_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(mancala_core PUBLIC OpenMP::OpenMP_CXX)
 
-add_executable(mancala_bench bench/bench.cpp)
-target_link_libraries(mancala_bench PRIVATE mancala_core)
+add_executable(bench bench/bench.cpp)
+target_link_libraries(bench PRIVATE mancala_core)
 
 if(NOT WIN32)
     add_executable(mancala_engine src/server.cpp)
@@ -33,8 +38,10 @@ add_executable(test_alphabeta tests/test_alphabeta.cpp)
 target_link_libraries(test_alphabeta PRIVATE mancala_core)
 add_test(NAME alphabeta_search COMMAND test_alphabeta)
 
-add_executable(test_mcts tests/test_mcts.cpp)
-target_link_libraries(test_mcts PRIVATE mancala_core)
-# test_mcts lee suite.txt desde el directorio de trabajo; lo copiamos al binario.
-add_test(NAME mcts_search COMMAND test_mcts
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/mcts.cpp AND
+   EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mcts.cpp)
+    add_executable(test_mcts tests/test_mcts.cpp)
+    target_link_libraries(test_mcts PRIVATE mancala_core)
+    add_test(NAME mcts_search COMMAND test_mcts
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+endif()

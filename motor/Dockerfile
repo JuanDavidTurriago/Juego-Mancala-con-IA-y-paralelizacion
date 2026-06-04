@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /src/build/mancala_engine /usr/local/bin/mancala_engine
-COPY --from=builder /src/build/mancala_bench /usr/local/bin/mancala_bench
+COPY --from=builder /src/build/bench /usr/local/bin/bench
 COPY tests/suite.txt /app/tests/suite.txt
 
 ENV MOTOR_PORT=9000
