@@ -1,14 +1,15 @@
 :root {
-  --bg: #f4f7fb;
-  --ink: #152033;
-  --muted: #64748b;
-  --line: #cbd5e1;
+  --bg: #eef2f7;
+  --ink: #132033;
+  --muted: #5f6d82;
+  --line: #d4dbe6;
   --panel: #ffffff;
-  --pit: #e6f0e7;
-  --pit-border: #7aa17d;
-  --store: #f5d5a3;
-  --store-border: #b7833f;
-  --accent: #2563eb;
+  --pit: #e7f0e8;
+  --pit-border: #7ca07f;
+  --store: #f5ddb1;
+  --store-border: #b98445;
+  --accent: #1d4ed8;
+  --accent-2: #0f766e;
 }
 
 * {
@@ -18,9 +19,12 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at top left, rgba(29, 78, 216, 0.08), transparent 30%),
+    radial-gradient(circle at 80% 10%, rgba(15, 118, 110, 0.08), transparent 25%),
+    var(--bg);
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI", "Liberation Sans", sans-serif;
 }
 
 .topbar {
@@ -37,6 +41,21 @@ body {
   margin: 0;
   font-size: 24px;
   letter-spacing: 0;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.topbar p:last-child {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .topbar p {
@@ -73,8 +92,9 @@ body {
 .result {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   padding: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
 }
 
 .board-panel {
@@ -103,7 +123,7 @@ body {
 
 .pit,
 .store {
-  border-radius: 8px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
   border: 2px solid var(--pit-border);
@@ -113,10 +133,26 @@ body {
 
 .pit {
   cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, outline-color 120ms ease;
 }
 
 .pit:hover {
-  outline: 3px solid rgba(37, 99, 235, 0.18);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 18px rgba(29, 78, 216, 0.12);
+}
+
+.pit:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pit.is-active {
+  border-color: var(--accent);
+  background: #eef4ff;
+}
+
+.pit.is-selected {
+  outline: 3px solid rgba(29, 78, 216, 0.24);
 }
 
 .pit span,
@@ -175,7 +211,7 @@ button {
 textarea {
   min-height: 112px;
   resize: vertical;
-  font-family: Consolas, "Liberation Mono", monospace;
+  font-family: "Liberation Mono", Consolas, monospace;
 }
 
 .field-grid {
@@ -190,6 +226,10 @@ button {
   color: #ffffff;
   cursor: pointer;
   font-weight: 700;
+}
+
+button:hover {
+  filter: brightness(1.03);
 }
 
 .result {
@@ -210,6 +250,16 @@ button {
   display: block;
   margin-top: 8px;
   font-size: 20px;
+}
+
+.hidden {
+  display: none;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 pre {
