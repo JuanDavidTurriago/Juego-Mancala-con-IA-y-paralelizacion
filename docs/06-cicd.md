@@ -8,7 +8,7 @@ La separacion es importante. `classroom.yml` pertenece al profesor y no debe mod
 
 ## Job del motor
 
-El job `motor` corre en Ubuntu. Instala `cmake`, `g++` y `libgomp1`, configura CMake en modo Release, compila y ejecuta `ctest`. Las pruebas registradas son `board_rules` y `alphabeta_search`. Despues ejecuta un benchmark de humo:
+El job `motor` corre en Ubuntu. Instala `cmake`, `g++` y `libgomp1`, configura CMake en modo Release, compila y ejecuta los ejecutables de prueba `test_board` y `test_alphabeta` (reglas del tablero y busqueda Alfa-Beta). Despues ejecuta un benchmark de humo:
 
 ```bash
 ./motor/build/mancala_bench --depth 4 --positions motor/tests/suite.txt --threads 1,2
@@ -42,13 +42,20 @@ El job `publish` solo corre en `push` a `main`. Hace login a `ghcr.io` con `GITH
 - `ghcr.io/<owner>/mancala-backend:<sha>`
 - `ghcr.io/<owner>/mancala-frontend:<sha>`
 
-El owner se normaliza a minusculas porque algunos registros rechazan nombres con mayusculas. El tag `${{ github.sha }}` es inmutable desde el punto de vista del repositorio: identifica exactamente el commit que produjo la imagen. Esto permite relacionar un despliegue de nube con una version de codigo concreta.
+El owner se normaliza a minusculas porque algunos registros rechazan nombres con mayusculas. El tag `${{ github.sha }}` es inmutable desde el punto de vista del repositorio: identifica exactamente el commit que produjo la imagen. **No se publica `latest`** en produccion; solo tags por SHA de commit. Esto permite relacionar un despliegue de nube con una version de codigo concreta.
 
 ## SonarQube
 
-El workflow declara un job `sonar` con `SonarSource/sonarqube-scan-action@v5`. Usa `SONAR_TOKEN` desde secrets y `SONAR_HOST_URL` desde variables del repositorio. El step tiene `continue-on-error: true` para no bloquear la entrega si el servidor Sonar no esta configurado en el repositorio de Classroom. Aun asi, la declaracion existe en YAML y muestra donde se integraria el analisis estatico.
+La integracion esta **solo en YAML** (`.github/workflows/sonar.yml`). No se usa el plugin de SonarQube del marketplace de GitHub; la rúbrica exige configuracion en el repositorio.
 
-En un entorno real se agregaria `sonar-project.properties` con llaves de proyecto, inclusiones y exclusiones. Para esta entrega, el enfasis esta en dejar el punto de integracion claro sin romper CI cuando no hay credenciales.
+El workflow `sonar.yml` ejecuta `SonarSource/sonarqube-scan-action@v5` con:
+
+- `SONAR_TOKEN` — secret del repositorio (Settings → Secrets and variables → Actions).
+- `SONAR_HOST_URL` — secret del repositorio (misma seccion; no variable).
+
+Configuracion del proyecto en `sonar-project.properties` (fuentes, tests y exclusiones). El job compila el motor antes del escaneo para dar contexto al analizador.
+
+Verificacion en GitHub: pestaña **Actions** → workflow **SonarQube** → run exitoso y resultado visible en el servidor Sonar asociado al `SONAR_HOST_URL`.
 
 ## CD hacia Kubernetes
 

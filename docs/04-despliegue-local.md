@@ -69,46 +69,93 @@ Un tablero con 14 posiciones pero total distinto de 48 tambien falla. Esta regla
 
 El frontend esta disponible en `http://localhost:8080`. Por defecto llama al backend en `http://localhost:8000`. La UI permite editar el arreglo del tablero, seleccionar `side`, `depth` y `threads`, y enviar la solicitud. Tambien pinta stores y pits para que sea mas facil detectar errores de indices. El navegador solo puede llamar al backend si CORS permite explicitamente el origen local; por eso el backend configura `http://localhost:8080` y `http://127.0.0.1:8080` en lugar de `"*"`.
 
-## Kubernetes local
+## Kubernetes local (kind)
 
-Los manifiestos para kind, minikube o k3d estan en `deploy/local/k8s/`. Se declaran:
+Los manifiestos estan en `deploy/local/k8s/`:
 
-- `configmap.yaml`: variables compartidas de motor y backend.
-- `motor.yaml`: Deployment y Service interno del motor.
-- `backend.yaml`: Deployment con 3 replicas y Service NodePort.
-- `frontend.yaml`: Deployment y Service NodePort en `30080`.
+- `configmap.yaml`: `MOTOR_URL=http://motor-svc:8080`, `MOTOR_PORT=8080`, CORS y timeouts.
+- `motor.yaml`: Deployment (2 replicas) y Service `motor-svc` (ClusterIP, puerto 8080).
+- `backend.yaml`: Deployment con **3 replicas** y Service `backend` (NodePort).
+- `frontend.yaml`: Deployment (2 replicas) y Service `frontend` (NodePort `30080`).
 
-Flujo recomendado con kind:
+### 1. Cluster e imagenes
+
+Sin cargar las imagenes en kind, los pods quedan en `ImagePullBackOff` porque el cluster no puede descargar tags locales.
 
 ```bash
-kind create cluster --name mancala-local
-docker build -t mancala-motor:local ./motor
-docker build -t mancala-backend:local ./backend
-docker build -t mancala-frontend:local ./frontend
-kind load docker-image mancala-motor:local --name mancala-local
-kind load docker-image mancala-backend:local --name mancala-local
-kind load docker-image mancala-frontend:local --name mancala-local
-kubectl apply -f deploy/local/k8s/
+kind create cluster --name mancala
+docker build -t mancala-motor ./motor
+docker build -t mancala-backend ./backend
+docker build -t mancala-frontend ./frontend
+kind load docker-image mancala-motor --name mancala
+kind load docker-image mancala-backend --name mancala
+kind load docker-image mancala-frontend --name mancala
 ```
 
-Verificacion:
+### 2. Aplicar manifiestos (orden)
+
+```bash
+kubectl apply -f deploy/local/k8s/configmap.yaml
+kubectl apply -f deploy/local/k8s/motor.yaml
+kubectl apply -f deploy/local/k8s/backend.yaml
+kubectl apply -f deploy/local/k8s/frontend.yaml
+```
+
+### 3. Verificacion de pods y replicas
+
+Todos los pods deben quedar en `Running` y `READY 1/1`:
 
 ```bash
 kubectl get pods
-kubectl get svc
-kubectl rollout status deployment/motor
-kubectl rollout status deployment/backend
-kubectl rollout status deployment/frontend
+kubectl get deployment backend
 ```
 
-Para probar el backend desde la maquina local:
+Evidencia de despliegue (backend **3/3 READY**):
+
+```text
+$ kubectl get deployment backend
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+backend   3/3     3            3           35s
+
+$ kubectl get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+backend-8669684f9b-6j8q4    1/1     Running   0          35s
+backend-8669684f9b-dsw4b    1/1     Running   0          35s
+backend-8669684f9b-wr42s    1/1     Running   0          35s
+frontend-67fd899df5-m7r8l   1/1     Running   0          35s
+frontend-67fd899df5-ww9mt   1/1     Running   0          35s
+motor-fc896d77b-5bnc6       1/1     Running   0          35s
+motor-fc896d77b-jsdwn       1/1     Running   0          35s
+```
+
+> **Captura de pantalla:** ejecutar `kubectl get deployment backend` y `kubectl get pods` en la terminal y pegar la imagen aqui si el informe lo exige visualmente. La salida anterior corresponde al cluster `mancala` verificado en integracion.
+
+### 4. Probes del backend
+
+```bash
+kubectl describe pod $(kubectl get pods -l app=backend -o jsonpath='{.items[0].metadata.name}')
+```
+
+Debe listar `Liveness` en `/healthz` y `Readiness` en `/readyz` (puerto 8000). Al final, `Conditions` con `Ready: True`. Un aviso transitorio de readiness al arrancar (mientras el motor aun no responde) es normal; si persiste, el pod entra en `CrashLoopBackOff` y conviene revisar logs del backend y del motor.
+
+### 5. Red interna backend → motor
+
+Desde un pod del backend (el contenedor no trae `curl`; usar Python):
+
+```bash
+kubectl exec deploy/backend -- python -c "import urllib.request; print(urllib.request.urlopen('http://motor-svc:8080/healthz', timeout=5).read().decode())"
+```
+
+Respuesta esperada: `{"status":"ok"}`.
+
+### 6. Acceso desde el host
 
 ```bash
 kubectl port-forward svc/backend 8000:8000
 curl -s http://localhost:8000/readyz
 ```
 
-Para probar el frontend:
+Frontend:
 
 ```bash
 kubectl port-forward svc/frontend 8080:80
@@ -138,7 +185,7 @@ docker compose -f deploy/local/docker-compose.yml down
 Para eliminar el cluster kind:
 
 ```bash
-kind delete cluster --name mancala-local
+kind delete cluster --name mancala
 ```
 
 Estos comandos no eliminan el codigo ni modifican la plantilla; solo limpian procesos y recursos locales.

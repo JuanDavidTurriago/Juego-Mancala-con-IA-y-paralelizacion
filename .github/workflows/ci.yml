@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, Bryan]
   pull_request:
-    branches: [main]
+    branches: [main, Bryan]
 
 permissions:
   contents: read
@@ -22,8 +22,10 @@ jobs:
         run: cmake -S motor -B motor/build -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build motor/build -j
-      - name: Test
-        run: ctest --test-dir motor/build --output-on-failure
+      - name: Run test_board
+        run: ./motor/build/test_board
+      - name: Run test_alphabeta
+        run: ./motor/build/test_alphabeta
       - name: Benchmark smoke test
         run: ./motor/build/mancala_bench --depth 4 --positions motor/tests/suite.txt --threads 1,2
 
@@ -87,18 +89,3 @@ jobs:
           context: frontend
           push: true
           tags: ghcr.io/${{ steps.vars.outputs.owner }}/mancala-frontend:${{ github.sha }}
-
-  sonar:
-    name: SonarQube analysis
-    runs-on: ubuntu-latest
-    needs: [motor, backend]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Run SonarQube scanner when configured
-        uses: SonarSource/sonarqube-scan-action@v5
-        continue-on-error: true
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}

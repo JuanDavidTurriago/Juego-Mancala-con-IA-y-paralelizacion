@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: mancala-backend:local
+          image: mancala-backend
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

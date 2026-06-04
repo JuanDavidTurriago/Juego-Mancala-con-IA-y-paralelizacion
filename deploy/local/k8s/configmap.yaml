@@ -3,8 +3,8 @@ kind: ConfigMap
 metadata:
   name: mancala-config
 data:
-  MOTOR_URL: "http://motor:9000"
+  MOTOR_URL: "http://motor-svc:8080"
   MOTOR_TIMEOUT_SECONDS: "10"
   CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
-  MOTOR_PORT: "9000"
+  MOTOR_PORT: "8080"
   OMP_NUM_THREADS: "4"
