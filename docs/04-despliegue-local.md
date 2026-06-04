@@ -82,7 +82,7 @@ Los manifiestos estan en `deploy/local/k8s/`:
 
 Los Deployments en `deploy/local/k8s/` referencian imágenes publicadas en GHCR con tag **SHA del commit** (sin `:latest`), por ejemplo:
 
-`ghcr.io/juandavidturriago/mancala-motor:6b352e0cc7de763eb2005257b416022c63ef27a1`
+`ghcr.io/juandavidturriago/mancala-motor:59d88e913725f887df469ccc8a661a848397f610`
 
 El job `publish` de CI solo corre en `push` a `main`; el tag debe coincidir con el commit publicado.
 
@@ -95,7 +95,7 @@ kubectl create secret docker-registry ghcr-credentials \
   --docker-password=<PAT_con_read:packages>
 
 # Verificar pull desde el host (opcional)
-docker pull ghcr.io/juandavidturriago/mancala-motor:6b352e0cc7de763eb2005257b416022c63ef27a1
+docker pull ghcr.io/juandavidturriago/mancala-motor:59d88e913725f887df469ccc8a661a848397f610
 ```
 
 ### 2. Aplicar manifiestos (orden)

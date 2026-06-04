@@ -18,7 +18,7 @@ spec:
         - name: ghcr-credentials
       containers:
         - name: frontend
-          image: ghcr.io/juandavidturriago/mancala-frontend:6b352e0cc7de763eb2005257b416022c63ef27a1
+          image: ghcr.io/juandavidturriago/mancala-frontend:59d88e913725f887df469ccc8a661a848397f610
           imagePullPolicy: Always
           ports:
             - containerPort: 80
