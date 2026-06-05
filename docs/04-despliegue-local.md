@@ -81,7 +81,7 @@ El frontend esta disponible en `http://localhost:8080`. Por defecto llama al bac
 
 Los manifiestos estan en `deploy/local/k8s/`:
 
-- `configmap.yaml`: `MOTOR_URL=http://motor-svc:8080`, `OMP_NUM_THREADS`, `DEFAULT_DEPTH`, CORS y timeouts.
+- `configmap.yaml`: `MOTOR_URL=http://motor-svc:8080`, `USE_MOCK=false`, `OMP_NUM_THREADS`, `DEFAULT_DEPTH`, CORS y timeouts.
 - `motor.yaml`: Deployment (2 replicas) y Service `motor-svc` (ClusterIP, puerto 8080).
 - `backend.yaml`: Deployment con **3 replicas** y Service `backend` (NodePort).
 - `frontend.yaml`: Deployment (2 replicas) y Service `frontend` (NodePort `30080`).
@@ -90,23 +90,42 @@ Los manifiestos estan en `deploy/local/k8s/`:
 
 Los Deployments en `deploy/local/k8s/` referencian imágenes publicadas en GHCR con tag **SHA del commit** (sin `:latest`), por ejemplo:
 
-`ghcr.io/juandavidturriago/mancala-motor:7f923db8c7091ff0b1b75cc06fffdba313f288be`
+`ghcr.io/juandavidturriago/mancala-motor:54835ea9507d0d7d2e74902481962420f051438f`
 
-El job `publish` de CI solo corre en `push` a `main`; el tag debe coincidir con el commit publicado.
+El job `publish` de CI corre en `push` a `main` o `Bryan`; el tag debe coincidir con el commit publicado.
+
+Con **kind**, no hace falta pull de GHCR si las imágenes se construyen localmente y se cargan al nodo:
 
 ```bash
+export SHA=54835ea9507d0d7d2e74902481962420f051438f
+export OWNER=juandavidturriago
+
 kind create cluster --name mancala
 
+kind load docker-image ghcr.io/${OWNER}/mancala-motor:${SHA} --name mancala
+kind load docker-image ghcr.io/${OWNER}/mancala-backend:${SHA} --name mancala
+kind load docker-image ghcr.io/${OWNER}/mancala-frontend:${SHA} --name mancala
+```
+
+Si el clúster debe hacer pull directo desde GHCR (sin `kind load`), crear el secret con un PAT `read:packages` (plantilla en `deploy/local/k8s/ghcr-secret.yaml.example`):
+
+```bash
 kubectl create secret docker-registry ghcr-credentials \
   --docker-server=ghcr.io \
   --docker-username=<GITHUB_USER> \
   --docker-password=<PAT_con_read:packages>
-
-# Verificar pull desde el host (opcional)
-docker pull ghcr.io/juandavidturriago/mancala-motor:7f923db8c7091ff0b1b75cc06fffdba313f288be
 ```
 
-### 2. Aplicar manifiestos (orden)
+### 2. Aplicar manifiestos
+
+```bash
+kubectl apply -f deploy/local/k8s/
+kubectl rollout status deployment/motor
+kubectl rollout status deployment/backend
+kubectl rollout status deployment/frontend
+```
+
+Orden equivalente por archivo:
 
 ```bash
 kubectl apply -f deploy/local/k8s/configmap.yaml
@@ -121,28 +140,36 @@ Todos los pods deben quedar en `Running` y `READY 1/1`:
 
 ```bash
 kubectl get pods
+kubectl get svc
+kubectl get deployments
 kubectl get deployment backend
 ```
 
-Evidencia de despliegue (backend **3/3 READY**):
+Evidencia de despliegue en cluster `mancala` (motor real, backend **3/3 READY**):
+
+![kubectl get pods](../img/k8s-pods.png)
+
+![kubectl get svc](../img/k8s-svc.png)
+
+![kubectl get deployments](../img/k8s-deployments.png)
+
+Salida textual de referencia:
 
 ```text
 $ kubectl get deployment backend
 NAME      READY   UP-TO-DATE   AVAILABLE   AGE
-backend   3/3     3            3           35s
+backend   3/3     3            3           38h
 
 $ kubectl get pods
 NAME                        READY   STATUS    RESTARTS   AGE
-backend-8669684f9b-6j8q4    1/1     Running   0          35s
-backend-8669684f9b-dsw4b    1/1     Running   0          35s
-backend-8669684f9b-wr42s    1/1     Running   0          35s
-frontend-67fd899df5-m7r8l   1/1     Running   0          35s
-frontend-67fd899df5-ww9mt   1/1     Running   0          35s
-motor-fc896d77b-5bnc6       1/1     Running   0          35s
-motor-fc896d77b-jsdwn       1/1     Running   0          35s
+backend-d4cc8974d-4bqwv     1/1     Running   0          117s
+backend-d4cc8974d-h5gqh     1/1     Running   0          103s
+backend-d4cc8974d-k69zm     1/1     Running   0          110s
+frontend-8648f46b7b-fz74l   1/1     Running   0          2m45s
+frontend-8648f46b7b-sbpw7   1/1     Running   0          2m52s
+motor-5cd9c6b857-48hl2      1/1     Running   0          2m45s
+motor-5cd9c6b857-8g2qh      1/1     Running   0          2m52s
 ```
-
-> **Captura de pantalla:** ejecutar `kubectl get deployment backend` y `kubectl get pods` en la terminal y pegar la imagen aqui si el informe lo exige visualmente. La salida anterior corresponde al cluster `mancala` verificado en integracion.
 
 ### 4. Probes del backend
 
@@ -169,13 +196,28 @@ kubectl port-forward svc/backend 8000:8000
 curl -s http://localhost:8000/readyz
 ```
 
-Frontend:
+Frontend (requiere también port-forward del backend en `:8000` porque la UI llama a `http://localhost:8000`):
 
 ```bash
+kubectl port-forward svc/backend 8000:8000
 kubectl port-forward svc/frontend 8080:80
 ```
 
-Luego abrir `http://localhost:8080`.
+Luego abrir `http://localhost:8080`. Si el puerto 8080 del host ya está ocupado (por ejemplo por un contenedor Docker previo), liberarlo antes del port-forward o usar otro puerto local (`8081:80`).
+
+Prueba de humo del flujo humano + motor real por API (mismos servicios del cluster vía port-forward):
+
+```bash
+curl -s -X POST http://localhost:8000/move \
+  -H "Content-Type: application/json" \
+  -d '{"tablero":[4,4,4,4,4,4,0,4,4,4,4,4,4,0],"lado":0,"movimiento":1,"algoritmo":"alphabeta","parametros":{"profundidad":4,"hilos":2}}'
+
+curl -s -X POST http://localhost:8000/move \
+  -H "Content-Type: application/json" \
+  -d '{"tablero":[4,0,5,5,5,5,0,4,4,4,4,4,4,0],"lado":1,"algoritmo":"alphabeta","parametros":{"profundidad":4,"hilos":2}}'
+```
+
+La respuesta del motor debe incluir `estadisticas.nodos > 0` (Alpha-Beta real, no mock).
 
 ## Diagnostico
 

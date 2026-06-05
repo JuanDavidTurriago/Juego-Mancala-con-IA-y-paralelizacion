@@ -22,10 +22,11 @@ jobs:
         run: cmake -S motor -B motor/build -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build motor/build -j
-      - name: Run test_board
-        run: ./motor/build/test_board
-      - name: Run test_alphabeta
-        run: ./motor/build/test_alphabeta
+      - name: Run motor unit tests
+        run: |
+          set -euo pipefail
+          ./motor/build/test_board
+          ./motor/build/test_alphabeta
       - name: Run test_mcts
         working-directory: motor/tests
         run: ../build/test_mcts
@@ -59,17 +60,30 @@ jobs:
         run: docker build -t mancala-backend:${{ github.sha }} backend
       - name: Build frontend image
         run: docker build -t mancala-frontend:${{ github.sha }} frontend
+      - name: Verify manifests avoid latest tag
+        run: |
+          if grep -rE --include='*.yaml' --include='*.yml' ':latest\b' deploy/local/k8s deploy/cloud; then
+            echo "Los manifiestos no deben usar el tag latest." >&2
+            exit 1
+          fi
 
   publish:
     name: Publish GHCR images
     runs-on: ubuntu-latest
     needs: docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Bryan')
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - name: Lowercase owner
         id: vars
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      - name: Verify immutable tag (commit SHA, not latest)
+        run: |
+          test "${{ github.sha }}" != "latest"
+          echo "Publishing images with tag: ${{ github.sha }}"
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -94,3 +108,21 @@ jobs:
           context: frontend
           push: true
           tags: ghcr.io/${{ steps.vars.outputs.owner }}/mancala-frontend:${{ github.sha }}
+      - name: Pin deployment manifests to published SHA
+        env:
+          GHCR_OWNER: ${{ steps.vars.outputs.owner }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: bash deploy/scripts/set-image-tags.sh
+      - name: Commit manifest tag updates
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/local/k8s deploy/cloud
+          if git diff --staged --quiet; then
+            echo "Manifiestos ya apuntan a ${IMAGE_TAG}."
+          else
+            git commit -m "chore(deploy): pin image tags to ${IMAGE_TAG}"
+            git push
+          fi

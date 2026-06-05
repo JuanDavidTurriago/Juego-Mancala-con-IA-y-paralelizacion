@@ -1,0 +1,8 @@
+﻿NAME                        READY   STATUS    RESTARTS   AGE
+backend-d4cc8974d-4bqwv     1/1     Running   0          117s
+backend-d4cc8974d-h5gqh     1/1     Running   0          103s
+backend-d4cc8974d-k69zm     1/1     Running   0          110s
+frontend-8648f46b7b-fz74l   1/1     Running   0          2m45s
+frontend-8648f46b7b-sbpw7   1/1     Running   0          2m52s
+motor-5cd9c6b857-48hl2      1/1     Running   0          2m45s
+motor-5cd9c6b857-8g2qh      1/1     Running   0          2m52s

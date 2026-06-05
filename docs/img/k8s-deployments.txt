@@ -1,0 +1,6 @@
+﻿NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+backend    3/3     3            3           38h
+frontend   2/2     2            2           38h
+motor      2/2     2            2           38h
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+backend   3/3     3            3           38h
