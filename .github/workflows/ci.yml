@@ -62,7 +62,7 @@ jobs:
         run: docker build -t mancala-frontend:${{ github.sha }} frontend
       - name: Verify manifests avoid latest tag
         run: |
-          if grep -rE ':latest\b' deploy/local/k8s deploy/cloud; then
+          if grep -rE --include='*.yaml' --include='*.yml' ':latest\b' deploy/local/k8s deploy/cloud; then
             echo "Los manifiestos no deben usar el tag latest." >&2
             exit 1
           fi
