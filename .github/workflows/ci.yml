@@ -22,10 +22,11 @@ jobs:
         run: cmake -S motor -B motor/build -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build motor/build -j
-      - name: Run test_board
-        run: ./motor/build/test_board
-      - name: Run test_alphabeta
-        run: ./motor/build/test_alphabeta
+      - name: Run motor unit tests
+        run: |
+          set -euo pipefail
+          ./motor/build/test_board
+          ./motor/build/test_alphabeta
       - name: Run test_mcts
         working-directory: motor/tests
         run: ../build/test_mcts
