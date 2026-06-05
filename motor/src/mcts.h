@@ -19,3 +19,21 @@ struct MCTSResult {
 //   c           – constante de exploración UCT (recomendado √2 ≈ 1.41421f)
 // ─────────────────────────────────────────────────────────────────────────────
 MCTSResult best_move_mcts(const Board& board, int simulations, float c);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resultado que devuelve best_move_mcts_parallel().
+// ─────────────────────────────────────────────────────────────────────────────
+struct MCTSParallelResult {
+  int    move           = -1;
+  float  win_rate       = 0.0f;
+  int    rollouts       = 0;
+  float  tree_depth_avg = 0.0f;
+  double elapsed_ms     = 0.0;
+  int    threads_used   = 0;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Función MCTS paralela (Root Parallelization)
+//   seed_base   – semilla base (opcional, útil para determinismo en tests)
+// ─────────────────────────────────────────────────────────────────────────────
+MCTSParallelResult best_move_mcts_parallel(const Board& board, int simulations, int nthreads, float c = 1.41421f, int seed_base = -1);
