@@ -14,6 +14,8 @@ spec:
       labels:
         app: motor
     spec:
+      imagePullSecrets:
+        - name: ghcr-credentials
       containers:
         - name: motor
           image: ghcr.io/juandavidturriago/mancala-motor:515aac695ae7baad380d6c40d8642c07bebdccdd

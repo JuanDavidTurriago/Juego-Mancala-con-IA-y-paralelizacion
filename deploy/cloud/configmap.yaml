@@ -5,6 +5,7 @@ metadata:
 data:
   MOTOR_URL: "http://motor:8080"
   MOTOR_TIMEOUT_SECONDS: "10"
+  USE_MOCK: "false"
   CORS_ORIGINS: "https://mancala.example.edu.co"
   OMP_NUM_THREADS: "4"
   DEFAULT_DEPTH: "8"
