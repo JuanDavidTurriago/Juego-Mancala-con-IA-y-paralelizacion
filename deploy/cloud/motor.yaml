@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: motor
-          image: ghcr.io/juandavidturriago/mancala-motor:54835ea9507d0d7d2e74902481962420f051438f
+          image: ghcr.io/juandavidturriago/mancala-motor:873524bc2b63f86193f123c1ecc850e560e89611
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
