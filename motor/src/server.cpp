@@ -63,6 +63,25 @@ bool read_int_field(const json& body, const char* name, int default_value, int& 
   return true;
 }
 
+bool read_int_field_any(const json& body, const json& params, const char* canonical_name,
+                        const char* legacy_name, int default_value, int& out) {
+  if (params.contains(canonical_name)) {
+    if (!params[canonical_name].is_number_integer()) {
+      return false;
+    }
+    out = params[canonical_name].get<int>();
+    return true;
+  }
+  if (body.contains(canonical_name)) {
+    if (!body[canonical_name].is_number_integer()) {
+      return false;
+    }
+    out = body[canonical_name].get<int>();
+    return true;
+  }
+  return read_int_field(body, legacy_name, default_value, out);
+}
+
 bool read_string_field(const json& body, const char* name, const char* default_value,
                        std::string& out) {
   if (!body.contains(name)) {
@@ -77,13 +96,20 @@ bool read_string_field(const json& body, const char* name, const char* default_v
 }
 
 bool load_board(const json& body, Board& board) {
-  if (!body.contains("board") || !is_integer_array(body["board"]) ||
-      body["board"].size() != kBoardSize) {
+  const json* board_value = nullptr;
+  if (body.contains("tablero")) {
+    board_value = &body["tablero"];
+  } else if (body.contains("board")) {
+    board_value = &body["board"];
+  }
+
+  if (board_value == nullptr || !is_integer_array(*board_value) ||
+      board_value->size() != kBoardSize) {
     return false;
   }
 
   for (int i = 0; i < kBoardSize; ++i) {
-    const int seeds = body["board"][i].get<int>();
+    const int seeds = (*board_value)[i].get<int>();
     if (seeds < 0) {
       return false;
     }
@@ -99,17 +125,19 @@ bool parse_move_request(const json& body, MoveRequest& out, std::string& error) 
     return false;
   }
 
-  if (!body.contains("side") || !body["side"].is_number_integer()) {
+  const char* side_field = body.contains("lado") ? "lado" : "side";
+  if (!body.contains(side_field) || !body[side_field].is_number_integer()) {
     error = "invalid side";
     return false;
   }
-  out.board.side_to_move = body["side"].get<int>();
+  out.board.side_to_move = body[side_field].get<int>();
   if (!is_valid_side(out.board.side_to_move)) {
     error = "invalid side";
     return false;
   }
 
-  if (!read_string_field(body, "algo", "alphabeta", out.algo)) {
+  const char* algo_field = body.contains("algoritmo") ? "algoritmo" : "algo";
+  if (!read_string_field(body, algo_field, "alphabeta", out.algo)) {
     error = "unknown algo";
     return false;
   }
@@ -121,7 +149,14 @@ bool parse_move_request(const json& body, MoveRequest& out, std::string& error) 
     return false;
   }
 
-  if (!read_int_field(body, "threads", 1, out.threads)) {
+  json empty_params = json::object();
+  const json& params = body.contains("parametros") ? body["parametros"] : empty_params;
+  if (!params.is_object()) {
+    error = "invalid parametros";
+    return false;
+  }
+
+  if (!read_int_field_any(body, params, "hilos", "threads", 1, out.threads)) {
     error = "invalid threads";
     return false;
   }
@@ -131,7 +166,7 @@ bool parse_move_request(const json& body, MoveRequest& out, std::string& error) 
   }
 
   if (out.algo == "alphabeta") {
-    if (!read_int_field(body, "depth", 8, out.depth)) {
+    if (!read_int_field_any(body, params, "profundidad", "depth", 8, out.depth)) {
       error = "invalid depth";
       return false;
     }
@@ -140,7 +175,7 @@ bool parse_move_request(const json& body, MoveRequest& out, std::string& error) 
       return false;
     }
   } else {
-    if (!read_int_field(body, "simulations", 1000, out.simulations)) {
+    if (!read_int_field_any(body, params, "simulaciones", "simulations", 1000, out.simulations)) {
       error = "invalid simulations";
       return false;
     }
@@ -164,16 +199,29 @@ json alphabeta_response(const MoveRequest& request) {
   g_total_prunes.fetch_add(result.prunes);
   g_total_elapsed_ms.fetch_add(static_cast<std::int64_t>(elapsed_ms));
 
+  json stats = json{
+      {"algo", "alphabeta"},
+      {"nodes", result.nodes},
+      {"prunes", result.prunes},
+  };
+  json estadisticas = json{
+      {"algoritmo", "alphabeta"},
+      {"profundidad", request.depth},
+      {"nodos", result.nodes},
+      {"podas", result.prunes},
+      {"tiempo_ms", static_cast<int>(elapsed_ms)},
+      {"hilos", result.threads_used},
+      {"evaluacion", result.value},
+  };
+
   return json{
       {"algo", "alphabeta"},
       {"move", result.move},
+      {"movimiento", result.move},
       {"evaluation", result.value},
       {"elapsed_ms", static_cast<int>(elapsed_ms)},
-      {"stats", json{
-          {"algo", "alphabeta"},
-          {"nodes", result.nodes},
-          {"prunes", result.prunes},
-      }},
+      {"stats", stats},
+      {"estadisticas", estadisticas},
       {"threads_used", result.threads_used},
   };
 }
@@ -189,17 +237,30 @@ json mcts_response(const MoveRequest& request) {
   g_total_rollouts.fetch_add(result.rollouts);
   g_total_elapsed_ms.fetch_add(static_cast<std::int64_t>(elapsed_ms));
 
+  json stats = json{
+      {"algo", "mcts"},
+      {"rollouts", result.rollouts},
+      {"win_rate", result.win_rate},
+      {"tree_depth_avg", result.tree_depth_avg},
+  };
+  json estadisticas = json{
+      {"algoritmo", "mcts"},
+      {"simulaciones", request.simulations},
+      {"rollouts", result.rollouts},
+      {"win_rate", result.win_rate},
+      {"tiempo_ms", static_cast<int>(elapsed_ms)},
+      {"hilos", 1},
+      {"evaluacion", evaluation},
+  };
+
   return json{
       {"algo", "mcts"},
       {"move", result.move},
+      {"movimiento", result.move},
       {"evaluation", evaluation},
       {"elapsed_ms", static_cast<int>(elapsed_ms)},
-      {"stats", json{
-          {"algo", "mcts"},
-          {"rollouts", result.rollouts},
-          {"win_rate", result.win_rate},
-          {"tree_depth_avg", result.tree_depth_avg},
-      }},
+      {"stats", stats},
+      {"estadisticas", estadisticas},
       {"threads_used", 1},
   };
 }
