@@ -7,95 +7,108 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="app-header">
       <div>
-        <p class="eyebrow">Fase 2</p>
-        <h1>Mancala Kalah(6,4)</h1>
-        <p>Tablero interactivo con backend real y respuesta del motor.</p>
+        <p class="phase">Fase 3</p>
+        <h1>Mancala Kalah</h1>
       </div>
-      <span id="status" class="status">API: checking</span>
+      <div class="header-actions">
+        <span id="apiStatus" class="status">API: verificando</span>
+        <button id="resetButton" class="ghost-button" type="button">Reiniciar partida</button>
+      </div>
     </header>
 
-    <main class="shell">
-      <section class="board-panel" aria-label="Tablero Mancala">
-        <div class="store store-p1">
-          <span>Jugador 1</span>
-          <strong id="store1">0</strong>
+    <main class="layout">
+      <section class="game-area" aria-label="Tablero de Mancala">
+        <div class="turn-strip">
+          <div>
+            <span>Turno</span>
+            <strong id="turnLabel">Jugador 1</strong>
+          </div>
+          <div>
+            <span>Estado</span>
+            <strong id="gameStatus">Listo</strong>
+          </div>
         </div>
-        <div class="pit-row pit-row-top" id="topRow"></div>
-        <div class="pit-row pit-row-bottom" id="bottomRow"></div>
-        <div class="store store-p0">
-          <span>Jugador 0</span>
-          <strong id="store0">0</strong>
+
+        <div class="board" id="board">
+          <div class="store store-p2" aria-label="Kalaha Jugador 2">
+            <span>Jugador 2</span>
+            <strong id="storeP2">0</strong>
+          </div>
+          <div class="pit-row pit-row-top" id="topRow"></div>
+          <div class="pit-row pit-row-bottom" id="bottomRow"></div>
+          <div class="store store-p1" aria-label="Kalaha Jugador 1">
+            <span>Jugador 1</span>
+            <strong id="storeP1">0</strong>
+          </div>
         </div>
+
+        <div id="message" class="message" role="status" aria-live="polite"></div>
       </section>
 
-      <section class="controls">
-        <div class="field-grid">
-          <label>
-            Jugador activo
-            <select id="side">
-              <option value="0">Jugador 0</option>
-              <option value="1">Jugador 1</option>
-            </select>
-          </label>
+      <aside class="side-panel" aria-label="Panel de configuracion y estadisticas">
+        <section class="panel-section">
+          <h2>Configuración</h2>
           <label>
             Algoritmo
-            <select id="algo">
-              <option value="alphabeta">alphabeta</option>
-              <option value="mcts">mcts</option>
+            <select id="algorithm">
+              <option value="alphabeta">Alpha-Beta</option>
+              <option value="mcts">MCTS</option>
             </select>
           </label>
-          <label id="depthGroup">
-            Profundidad
-            <input id="depth" type="number" value="8" min="1" max="32" />
-          </label>
-          <label id="simulationsGroup" class="hidden">
-            Simulaciones
-            <input id="simulations" type="number" value="1000" min="1" max="100000" />
-          </label>
-          <label>
-            Hilos
-            <input id="threads" type="number" value="4" min="1" max="64" />
-          </label>
-        </div>
+          <div class="settings-grid">
+            <label id="depthField">
+              Profundidad
+              <input id="depth" type="number" min="1" max="32" value="6" />
+            </label>
+            <label id="simulationsField" class="hidden">
+              Simulaciones
+              <input id="simulations" type="number" min="1" max="100000" value="1000" />
+            </label>
+            <label>
+              Hilos
+              <input id="threads" type="number" min="1" max="64" value="4" />
+            </label>
+          </div>
+        </section>
 
-        <label>
-          Board JSON
-          <textarea id="board" spellcheck="false">[4,4,4,4,4,4,0,4,4,4,4,4,4,0]</textarea>
-        </label>
+        <section class="panel-section stats-section">
+          <h2>Estadísticas</h2>
+          <div class="stats-grid">
+            <div class="stat">
+              <span>Algoritmo activo</span>
+              <strong id="statAlgorithm">Alpha-Beta</strong>
+            </div>
+            <div class="stat">
+              <span id="statPrimaryLabel">Profundidad</span>
+              <strong id="statPrimary">6</strong>
+            </div>
+            <div class="stat">
+              <span>Tiempo</span>
+              <strong id="statTime">0 ms</strong>
+            </div>
+            <div class="stat">
+              <span id="statNodesLabel">Nodos</span>
+              <strong id="statNodes">0</strong>
+            </div>
+            <div class="stat">
+              <span id="statSecondaryLabel">Podas</span>
+              <strong id="statSecondary">0</strong>
+            </div>
+            <div class="stat">
+              <span>Última jugada</span>
+              <strong id="statMove">-</strong>
+            </div>
+          </div>
+        </section>
 
-        <button id="btnMove" type="button">Calcular jugada</button>
-        <p id="hint" class="hint">Haz clic en un hoyo del jugador activo para consultar el motor.</p>
-      </section>
-
-      <section class="result">
-        <div class="metric">
-          <span>Jugada</span>
-          <strong id="resultMove">-</strong>
-        </div>
-        <div class="metric">
-          <span>Evaluación</span>
-          <strong id="resultEvaluation">-</strong>
-        </div>
-        <div class="metric">
-          <span>Tiempo</span>
-          <strong id="resultElapsed">-</strong>
-        </div>
-        <div class="metric">
-          <span>Algoritmo</span>
-          <strong id="resultAlgo">-</strong>
-        </div>
-        <div class="metric">
-          <span>Estadísticas</span>
-          <strong id="resultStats">-</strong>
-        </div>
-        <div class="metric">
-          <span>Hilos</span>
-          <strong id="resultThreads">-</strong>
-        </div>
-        <pre id="out"></pre>
-      </section>
+        <section id="finalPanel" class="panel-section final-panel hidden">
+          <h2>Resultado</h2>
+          <p id="finalText"></p>
+          <button id="finalResetButton" type="button">Reiniciar partida</button>
+        </section>
+      </aside>
     </main>
 
     <script src="app.js"></script>
