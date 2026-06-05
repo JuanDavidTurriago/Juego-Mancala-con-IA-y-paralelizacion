@@ -25,7 +25,7 @@
 #include <memory>
 #include <random>
 #include <vector>
-
+#include <omp.h>
 // ─────────────────────────────────────────────────────────────────────────────
 // Nodo del árbol MCTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,6 +276,108 @@ MCTSResult best_move_mcts(const Board& board, int simulations, float c) {
     const auto moves = legal_moves(board);
     if (!moves.empty()) out.move = moves[0];
   }
+
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Función principal: best_move_mcts_parallel (Root Parallelization)
+// ─────────────────────────────────────────────────────────────────────────────
+MCTSParallelResult best_move_mcts_parallel(const Board& board, int simulations, int nthreads, float c, int seed_base) {
+  const int pov = board.side_to_move;
+  
+  MCTSParallelResult out;
+  if (simulations <= 0 || nthreads <= 0) return out;
+
+  const int sims_per_thread = simulations / nthreads;
+  
+  // Medición de tiempo
+  const double start_time = omp_get_wtime();
+
+  // Acumuladores de resultados desde la raíz
+  const std::vector<int> initial_moves = legal_moves(board);
+  if (initial_moves.empty()) return out; // Estado terminal
+  
+  struct MoveStats {
+    double w = 0.0;
+    int n = 0;
+  };
+  std::vector<MoveStats> global_stats(initial_moves.size());
+
+  long long total_depth = 0;
+
+  #pragma omp parallel num_threads(nthreads)
+  {
+    #pragma omp single
+    {
+      out.threads_used = omp_get_num_threads();
+    }
+
+    // RNG por hilo
+    const int thread_id = omp_get_thread_num();
+    int seed = (seed_base == -1) ? std::random_device{}() : (seed_base + thread_id);
+    std::mt19937 rng(seed);
+
+    // Árbol local
+    auto root = std::make_unique<MCTSNode>(board, -1, nullptr);
+    long long local_depth = 0;
+
+    for (int sim = 0; sim < sims_per_thread; ++sim) {
+      MCTSNode* node = select(root.get(), static_cast<double>(c), pov);
+      if (!node->is_terminal()) {
+        node = expand(node, rng);
+      }
+      int rollout_depth = 0;
+      const double result = rollout(node->state, pov, rng, rollout_depth);
+      local_depth += rollout_depth;
+      backpropagate(node, result, pov);
+    }
+
+    // Acumular estadísticas localmente
+    std::vector<MoveStats> local_stats(initial_moves.size());
+    for (const auto& child : root->children) {
+      // Buscar índice en initial_moves
+      auto it = std::find(initial_moves.begin(), initial_moves.end(), child->move);
+      if (it != initial_moves.end()) {
+        const size_t idx = std::distance(initial_moves.begin(), it);
+        local_stats[idx].w += child->w;
+        local_stats[idx].n += child->n;
+      }
+    }
+
+    // Reducción global
+    #pragma omp critical
+    {
+      for (size_t i = 0; i < initial_moves.size(); ++i) {
+        global_stats[i].w += local_stats[i].w;
+        global_stats[i].n += local_stats[i].n;
+      }
+      total_depth += local_depth;
+    }
+  }
+
+  const double end_time = omp_get_wtime();
+  out.elapsed_ms = (end_time - start_time) * 1000.0;
+
+  // Actualizar estadísticas totales
+  const int total_rollouts = sims_per_thread * out.threads_used;
+  out.rollouts = total_rollouts;
+  out.tree_depth_avg = total_rollouts > 0 ? static_cast<float>(total_depth) / total_rollouts : 0.0f;
+
+  // Elegir el mejor movimiento sumado
+  int best_n = -1;
+  double best_rate = 0.0;
+  out.move = initial_moves[0]; // Fallback
+
+  for (size_t i = 0; i < initial_moves.size(); ++i) {
+    if (global_stats[i].n > best_n) {
+      best_n = global_stats[i].n;
+      out.move = initial_moves[i];
+      best_rate = global_stats[i].n > 0 ? global_stats[i].w / global_stats[i].n : 0.0;
+    }
+  }
+  
+  out.win_rate = static_cast<float>(best_rate);
 
   return out;
 }

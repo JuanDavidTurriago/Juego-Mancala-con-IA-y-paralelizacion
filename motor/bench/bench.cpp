@@ -163,6 +163,24 @@ MCTSAvgStats average_mcts(const std::vector<Board>& positions, int simulations) 
     return stats;
 }
 
+MCTSAvgStats average_mcts_parallel(const std::vector<Board>& positions, int simulations, int threads) {
+    MCTSAvgStats stats;
+    for (const Board& pos : positions) {
+        MCTSParallelResult result = best_move_mcts_parallel(pos, simulations, threads);
+        stats.elapsed_ms += result.elapsed_ms;
+        stats.rollouts += result.rollouts;
+        stats.win_rate += result.win_rate;
+        stats.tree_depth_avg += result.tree_depth_avg;
+    }
+
+    const double count = static_cast<double>(positions.size());
+    stats.elapsed_ms /= count;
+    stats.rollouts /= count;
+    stats.win_rate /= count;
+    stats.tree_depth_avg /= count;
+    return stats;
+}
+
 void print_row(const std::string& label, const AvgStats& stats, double speedup, double efficiency) {
     std::cout << std::setw(7) << label << " | "
               << std::setw(7) << std::fixed << std::setprecision(1) << stats.elapsed_ms << " | "
@@ -207,6 +225,49 @@ int run_alphabeta(const Args& args) {
     return 0;
 }
 
+void print_mcts_row(const std::string& label, const MCTSAvgStats& stats, double speedup, double efficiency) {
+    std::cout << std::setw(7) << label << " | "
+              << std::setw(7) << std::fixed << std::setprecision(1) << stats.elapsed_ms << " | "
+              << std::setw(5) << std::setprecision(2) << speedup << " | "
+              << std::setw(5) << std::setprecision(2) << efficiency << " | "
+              << std::setw(12) << std::fixed << std::setprecision(0) << stats.rollouts << "\n";
+}
+
+void run_comparison(const std::vector<Board>& positions) {
+    std::cout << "=== Comparativa Final AB vs MCTS (Presupuesto ~500ms) ===\n\n";
+    if (positions.empty()) return;
+    Board pos = positions[0]; // Evaluar en la primera posición
+    
+    int ab_depth = 1;
+    double ab_time = 0;
+    ABResult best_ab;
+    while (true) {
+        auto t0 = std::chrono::steady_clock::now();
+        best_ab = best_move_alphabeta(pos, ab_depth + 1);
+        auto t1 = std::chrono::steady_clock::now();
+        double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        if (ms > 500.0 && ab_depth >= 1) break;
+        ab_depth++;
+        ab_time = ms;
+        if (ms > 500.0) break;
+    }
+    
+    int mcts_sims = 10000;
+    double mcts_time = 0;
+    MCTSParallelResult best_mcts;
+    while (true) {
+        best_mcts = best_move_mcts_parallel(pos, mcts_sims, 4);
+        mcts_time = best_mcts.elapsed_ms;
+        if (mcts_time > 500.0 && mcts_sims > 10000) break;
+        if (mcts_time > 500.0) break;
+        mcts_sims += 10000;
+    }
+    
+    std::cout << "Presupuesto: ~500ms\n";
+    std::cout << "AlphaBeta -> Profundidad alcanzada: " << ab_depth << " (T: " << ab_time << "ms, Mov: " << best_ab.move << ")\n";
+    std::cout << "MCTS (p=4)-> Simulaciones alcanzadas: " << mcts_sims << " (T: " << mcts_time << "ms, Mov: " << best_mcts.move << ")\n\n";
+}
+
 int run_mcts(const Args& args) {
     std::vector<Board> positions = load_positions(args.positions);
     if (positions.empty()) {
@@ -214,18 +275,27 @@ int run_mcts(const Args& args) {
         return 1;
     }
 
-    std::cout << "=== MCTS Benchmark - simulations=" << args.simulations << " - "
-              << positions.size() << " posiciones ===\n\n";
+    std::cout << "=== MCTS Parallel Benchmark - " << positions.size() << " posiciones ===\n\n";
 
-    const MCTSAvgStats stats = average_mcts(positions, args.simulations);
-    std::cout << "simulations | T ms avg | rollouts_avg | win_rate_avg | rollout_depth_avg\n";
-    std::cout << "------------|----------|--------------|--------------|------------------\n";
-    std::cout << std::setw(11) << args.simulations << " | "
-              << std::setw(8) << std::fixed << std::setprecision(1) << stats.elapsed_ms << " | "
-              << std::setw(12) << std::fixed << std::setprecision(0) << stats.rollouts << " | "
-              << std::setw(12) << std::fixed << std::setprecision(3) << stats.win_rate << " | "
-              << std::setw(16) << std::fixed << std::setprecision(1) << stats.tree_depth_avg
-              << "\n";
+    const std::vector<int> sim_budgets = {10000, 100000};
+    const std::vector<int> thread_counts = {1, 2, 4, 8};
+
+    for (int sims : sim_budgets) {
+        std::cout << "[Simulations: " << sims << "]\n";
+        std::cout << "threads | T(p) ms | S(p) | E(p) | rollouts_avg\n";
+        std::cout << "--------|---------|------|------|-------------\n";
+        
+        MCTSAvgStats p1 = average_mcts_parallel(positions, sims, 1);
+        for (int p : thread_counts) {
+            MCTSAvgStats stats = (p == 1) ? p1 : average_mcts_parallel(positions, sims, p);
+            double speedup = stats.elapsed_ms > 0 ? p1.elapsed_ms / stats.elapsed_ms : 0.0;
+            double efficiency = p > 0 ? speedup / p : 0.0;
+            print_mcts_row(std::to_string(p), stats, speedup, efficiency);
+        }
+        std::cout << "\n";
+    }
+
+    run_comparison(positions);
     return 0;
 }
 

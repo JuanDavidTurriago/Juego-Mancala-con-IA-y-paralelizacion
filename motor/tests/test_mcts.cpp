@@ -323,6 +323,72 @@ bool test_rollouts_equals_simulations() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TEST 5 — Equivalencia secuencial vs paralelo
+// ─────────────────────────────────────────────────────────────────────────────
+bool test_mcts_parallel_equivalence() {
+  std::cout << "[Test 5] Equivalencia MCTS paralelo (Top-2)\n";
+  Board board;
+  // Buscamos los 2 favoritos del secuencial con un presupuesto de 10k
+  int counts[14] = {0};
+  for(int i=0; i<5; ++i) {
+    counts[best_move_mcts(board, 10000, 1.41421f).move]++;
+  }
+  std::vector<std::pair<int, int>> favs;
+  for(int i=0; i<14; ++i) {
+    if(counts[i]>0) favs.push_back({counts[i], i});
+  }
+  std::sort(favs.rbegin(), favs.rend());
+  
+  bool ok = true;
+  for (int p : {1, 2, 4}) {
+    auto res = best_move_mcts_parallel(board, 10000, p);
+    bool in_top = false;
+    for (size_t i = 0; i < std::min<size_t>(2, favs.size()); ++i) {
+      if (res.move == favs[i].second) in_top = true;
+    }
+    // Es posible que el estocástico falle en alguna iteración, pero la prueba verifica que la lógica sea congruente
+    std::string msg = "Paralelo con p=" + std::to_string(p) + " elige top-2";
+    ok &= expect_true(in_top, msg.c_str());
+  }
+  std::cout << (ok ? "  PASS\n" : "  FAIL\n");
+  return ok;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEST 6 — Speedup MCTS paralelo
+// ─────────────────────────────────────────────────────────────────────────────
+bool test_mcts_parallel_speedup() {
+  std::cout << "[Test 6] Speedup MCTS paralelo\n";
+  Board board;
+  auto t1 = best_move_mcts_parallel(board, 100000, 1);
+  auto t4 = best_move_mcts_parallel(board, 100000, 4);
+  
+  double speedup = t1.elapsed_ms > 0 ? t1.elapsed_ms / t4.elapsed_ms : 0.0;
+  std::cout << "  T(1)=" << t1.elapsed_ms << "ms, T(4)=" << t4.elapsed_ms << "ms, Speedup=" << speedup << "\n";
+  
+  bool ok = expect_true(speedup > 1.0, "Speedup T(1)/T(4) > 1.0");
+  std::cout << (ok ? "  PASS\n" : "  FAIL\n");
+  return ok;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEST 7 — Determinismo MCTS paralelo
+// ─────────────────────────────────────────────────────────────────────────────
+bool test_mcts_parallel_determinism() {
+  std::cout << "[Test 7] Determinismo MCTS paralelo\n";
+  Board board;
+  int seed = 42;
+  auto run1 = best_move_mcts_parallel(board, 20000, 4, 1.41421f, seed);
+  auto run2 = best_move_mcts_parallel(board, 20000, 4, 1.41421f, seed);
+  
+  bool ok = expect_true(run1.move == run2.move, "Movimientos elegidos exactamente iguales");
+  ok &= expect_true(std::abs(run1.win_rate - run2.win_rate) < 1e-6f, "Win rate exactamente igual");
+  
+  std::cout << (ok ? "  PASS\n" : "  FAIL\n");
+  return ok;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // main
 // ─────────────────────────────────────────────────────────────────────────────
 int main() {
@@ -335,8 +401,11 @@ int main() {
   passed += test_convergence()             ? 1 : 0;
   passed += test_match_rate_vs_alphabeta() ? 1 : 0;
   passed += test_rollouts_equals_simulations() ? 1 : 0;
+  passed += test_mcts_parallel_equivalence() ? 1 : 0;
+  passed += test_mcts_parallel_speedup() ? 1 : 0;
+  passed += test_mcts_parallel_determinism() ? 1 : 0;
 
   std::cout << "========================================\n";
-  std::cout << passed << "/4 tests passed\n";
-  return passed == 4 ? 0 : 1;
+  std::cout << passed << "/7 tests passed\n";
+  return passed == 7 ? 0 : 1;
 }

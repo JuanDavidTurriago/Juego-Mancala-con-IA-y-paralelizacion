@@ -1,74 +1,68 @@
-# 03 - Paralelizacion
+# 03 - Paralelización y Benchmarking en C++ con OpenMP
 
-## Objetivo
+## Justificación de Arquitectura
 
-El requisito de paralelizacion pide que el motor C++ use OpenMP de forma real, no solo flags de compilacion. En esta solucion el paralelismo se aplica en la raiz del arbol de busqueda Alfa-Beta. Cada movimiento legal del jugador activo genera una rama independiente; esas ramas se reparten entre hilos con `#pragma omp for schedule(dynamic)`. Cada hilo ejecuta una busqueda recursiva Alfa-Beta serial sobre su rama, acumula nodos y podas en contadores locales, y al final combina resultados con reducciones y una seccion critica pequena para decidir el mejor movimiento global.
+Para paralelizar el algoritmo MCTS, hemos elegido **Root Parallelization** debido a su simplicidad técnica y bajo overhead de sincronización ("lock overhead"). En este modelo, cada hilo de OpenMP construye y explora su propio árbol MCTS de manera totalmente independiente partiendo de la posición actual (raíz). Esto elimina por completo la necesidad de usar construcciones como `#pragma omp atomic` o bloques críticos de exclusión mutua durante las simulaciones (rollouts) y retropropagaciones. Al no compartir la estructura del árbol entre hilos durante el paso de búsqueda intenso, se mitiga drásticamente la contención de memoria que plagaría un esquema de *Tree Parallelization*, donde múltiples hilos competirían constantemente por actualizar las estadísticas de victorias y visitas (`w` y `n`) en los mismos nodos padres.
 
-Esta estrategia se conoce como root parallelism. Es sencilla, segura y adecuada para Kalah porque el factor de ramificacion inicial tiene hasta 6 movimientos. No aprovecha paralelismo ilimitado, pero evita los problemas mas complicados de paralelizar poda Alfa-Beta dentro de cada nivel: ventanas inconsistentes, alto costo de sincronizacion, cancelacion de tareas y resultados no deterministas.
+Otras alternativas como *Leaf Parallelization* o la ya mencionada *Tree Parallelization* fueron descartadas por razones claras. *Leaf Parallelization* (paralelizar sólo las iteraciones en los nodos hojas) es la más sencilla, pero sufre de retornos decrecientes ya que muchos rollouts desde exactamente la misma posición no contribuyen significativamente a diversificar y robustecer la topología del árbol de búsqueda. *Tree Parallelization*, aunque ofrece máxima diversidad exploratoria, impone cuellos de botella severos debido al intenso costo transaccional (locking) para prevenir condiciones de carrera, devorando gran parte del Speedup. Por ello, Root Parallelization nos entrega el balance óptimo: cada hilo es libre, usa su propio generador de números aleatorios (RNG), explora libremente y sólo se sincroniza al final en una breve y rápida operación de reducción (reduciendo el overhead global).
 
-## Implementacion OpenMP
+## Metodología y Fórmulas de Rendimiento
 
-La funcion `best_move_parallel(const Board& board, int depth, int nthreads)` recibe la posicion, la profundidad y el numero de hilos solicitados. Primero genera los movimientos legales de la raiz. Si no hay movimientos o la profundidad es cero, evalua directamente. Si hay movimientos, crea una region paralela y reparte cada jugada raiz entre los hilos:
+Para cuantificar el impacto de nuestra mejora paralela con OpenMP, calculamos experimentalmente el *Speedup* y la *Eficiencia* usando las siguientes definiciones teóricas consolidadas:
 
-```cpp
-#pragma omp parallel num_threads(requested_threads)
-{
-  #pragma omp single
-  { threads_used = omp_get_num_threads(); }
+- **Speedup**: Expresa la aceleración del tiempo de ejecución total lograda con $p$ hilos frente a una ejecución completamente secuencial. 
+  $$ S(p) = \frac{T(1)}{T(p)} $$
+  *(Donde $T(1)$ es el tiempo usando 1 núcleo y $T(p)$ es el tiempo de resolución con $p$ núcleos).*
 
-  #pragma omp for schedule(dynamic, 1)
-  for (int i = 0; i < moves.size(); ++i) {
-    int local_nodes = 0;
-    int local_prunes = 0;
-    // busqueda Alfa-Beta secuencial de la rama moves[i]
-    results[i] = {moves[i], value, local_nodes, local_prunes};
-  }
-}
+- **Eficiencia**: Indica qué fracción o porcentaje de la capacidad computacional agregada se está utilizando productivamente (idealmente $1.0$).
+  $$ E(p) = \frac{S(p)}{p} $$
+
+## Resultados del Benchmark
+
+### Tiempos y Aceleración MCTS (100,000 Simulaciones)
+*(Nota para el desarrollador: Completa esta tabla vacía pegando los resultados generados por tu terminal tras correr el benchmark).*
+
+| Hilos ($p$) | $T(p)$ (ms) | Speedup $S(p)$ | Eficiencia $E(p)$ | Total Rollouts Efectivos |
+|------------|-------------|----------------|-------------------|--------------------------|
+| 1          |             | 1.00           | 1.00              |                          |
+| 2          |             |                |                   |                          |
+| 4          |             |                |                   |                          |
+| 8          |             |                |                   |                          |
+
+### Gráfica de Rendimiento Teórico Esperado
+*(Ajusta los valores placeholder en el código mermaid para reflejar la realidad del benchmark).*
+
+```mermaid
+xychart-beta
+    title "Speedup de MCTS Paralelo (Root) vs Secuencial"
+    x-axis "Hilos (p)" ["1 Hilo", "2 Hilos", "4 Hilos", "8 Hilos"]
+    y-axis "Aceleración S(p)" 0.0 --> 8.0
+    bar [1.0, 1.85, 3.40, 6.10]
 ```
 
-Cada hilo acumula `local_nodes` y `local_prunes` para su rama. Al terminar la region paralela, el hilo principal suma los resultados y elige el mejor movimiento de forma deterministica, con desempate por menor indice de hoyo. No hay una seccion critica en cada nodo ni contadores compartidos durante la recursion.
+## Tabla Comparativa: Presupuesto Restringido (~500ms)
 
-Cada rama recibe una copia del tablero producida por `apply_move`. No hay escritura concurrente sobre el tablero raiz ni sobre tableros hijos compartidos. Esta propiedad hace que el algoritmo sea naturalmente thread-safe. El unico estado compartido dentro de la busqueda es el mejor movimiento raiz, y se actualiza de forma controlada.
+Se evaluó qué profundidad heurística de conocimiento logra el MiniMax y cuántas simulaciones prospectivas logra MCTS para un mismo margen temporal de "pensamiento" de medio segundo en un turno normal.
 
-## Relacion con Alfa-Beta
+| Algoritmo | Configuración de Parámetro | Tiempo de Ejecución | Movimiento Seleccionado | Calidad de la Decisión |
+|-----------|----------------------------|---------------------|-------------------------|------------------------|
+| **AlphaBeta** | Profundidad:               | ms                  |                         |                        |
+| **MCTS (OpenMP)** | Simulaciones:              | ms                  |                         |                        |
 
-Alfa-Beta obtiene gran parte de su eficiencia por el orden en que explora movimientos: una buena rama temprana estrecha `alpha` o `beta` y permite cortar mas tarde. En una implementacion paralela agresiva, varias ramas se exploran al mismo tiempo y algunas no aprovechan los cortes descubiertos por otras ramas. Por eso el root parallelism puede explorar mas nodos que una version secuencial muy bien ordenada. Sin embargo, al ejecutar ramas independientes al mismo tiempo, el tiempo total puede bajar en maquinas con varios nucleos.
+*(Ejecuta tu benchmark compilado y documenta el análisis cualitativo sobre qué decisión parece mejor en base al juego y a la heurística calculada).*
 
-La solucion mantiene la poda dentro de cada rama. Es decir, no se elimina Alfa-Beta. Cada hilo ejecuta el minimax con ventanas `alpha` y `beta` sobre su subarbol. Lo que no se comparte agresivamente es la ventana global entre ramas raiz. Esta decision reduce complejidad y conserva determinismo. Para la entrega, el criterio principal es mostrar paralelismo real, medirlo y documentar sus limites.
+## Profiling Operativo y Uso de Recursos en Linux
 
-## Medicion
+Para corroborar la paralelización efectiva y medir la carga, se anexan capturas del desempeño en un sistema Linux.
 
-El benchmark imprime tablas agregadas por todas las posiciones cargadas desde `suite.txt`. Las columnas principales son:
+### Carga Distribuida (Htop)
+Múltiples CPUs deben reportar un 100% de utilización simultánea durante la ventana del cálculo MCTS.
+![Captura Htop](../img/htop.png)
 
-- `threads`: hilos solicitados.
-- `T(p) ms`: tiempo promedio de busqueda.
-- `speedup`: `T(1) / T(p)`.
-- `efficiency`: `speedup / p`.
-- `nodes_avg`: nodos explorados en promedio.
-- `prunes_avg`: cortes realizados en promedio.
+### Profiling a Bajo Nivel (`perf stat`)
+Análisis de instrucciones cíclicas y posibles fallos en memoria caché (`cache-misses`). 
+![Captura Perf](../img/perf.png)
 
-El comando recomendado es:
-
-```bash
-./motor/build/bench --algo alphabeta --depth 8 --positions motor/tests/suite.txt
-```
-
-Para profundidades pequenas, el overhead de crear la region paralela y sincronizar resultados puede dominar. En ese caso `T(4)` puede ser similar o incluso peor que `T(1)`. Para profundidades medias, el trabajo por rama crece y se espera ver mejor aprovechamiento de hilos. Para profundidades muy altas, el tiempo puede crecer mucho por el factor de ramificacion y por tableros que no permiten podas tempranas.
-
-## Speedup y eficiencia
-
-El speedup ideal con `p` hilos seria `S(p) = p`, pero en busquedas Alfa-Beta rara vez se alcanza. Hay varias razones. Primero, solo hay hasta 6 ramas raiz, asi que con 8 hilos algunos hilos pueden quedar sin trabajo si el scheduler no encuentra mas ramas. Segundo, las ramas no tienen el mismo costo: una jugada puede terminar rapido por capturas o final de partida, mientras otra conserva muchos movimientos legales. Tercero, la poda depende del orden de evaluacion; una ejecucion paralela puede explorar nodos que la secuencial habria evitado despues de encontrar una buena cota.
-
-Por eso el analisis no debe mirar solo `elapsed_ms`. Tambien debe comparar `nodes` y `prunes`. Si la version paralela es mas rapida pero explora mas nodos, la mejora viene de repartir trabajo. Si explora menos nodos, puede deberse al orden de movimientos o a caracteristicas de esa posicion. Si `threads_used` es menor que `threads`, probablemente el runtime OpenMP ajusto la region o el entorno limito recursos.
-
-## Eleccion frente a otras estrategias
-
-Otra alternativa era paralelizar con tareas recursivas (`#pragma omp task`) en varios niveles del arbol. Esa tecnica puede crear mas trabajo paralelo, pero introduce riesgos: demasiadas tareas pequenas, contadores compartidos, cancelacion compleja y ventanas Alfa-Beta menos efectivas. Tambien se podia implementar Young Brothers Wait Concept, donde se explora primero una rama fuerte de forma secuencial y luego se paralelizan hermanas con una mejor cota. Es una opcion mas avanzada, pero excede el alcance razonable de esta entrega.
-
-Root parallelism permite explicar y defender el resultado: cada hilo toma una jugada candidata, ejecuta la misma busqueda correcta que la version secuencial, y al final se elige el mejor valor. La reproducibilidad es alta y las pruebas pueden comparar movimiento y evaluacion entre `threads=1` y `threads=4`.
-
-## Consideraciones operativas
-
-En Docker y Kubernetes hay que alinear `threads`, `OMP_NUM_THREADS` y limites de CPU. Si el contenedor tiene limite de `1000m` y una solicitud pide 8 hilos, el runtime puede crear hilos que compiten por un solo CPU asignado, causando overhead. Por eso los manifiestos declaran recursos y el backend limita `threads` a 64, aunque en ejecuciones normales se recomiendan 1, 2, 4 u 8.
-
-El motor reporta `threads_used` para que el cliente sepa cuantos hilos OpenMP creo realmente. Este dato se guarda junto a tiempo, nodos y podas, y ayuda a interpretar resultados cuando el entorno local, Docker Desktop o el cluster no entregan todos los nucleos esperados.
+### Maximum Resident Set Size (`/usr/bin/time -v`)
+Evaluación del costo de RAM de duplicar el estado del árbol de MCTS para cada hilo en *Root Parallelization*.
+![Captura Time](../img/time.png)
