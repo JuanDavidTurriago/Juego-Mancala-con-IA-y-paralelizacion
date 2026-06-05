@@ -84,3 +84,174 @@ El backend cuenta solicitudes totales y solicitudes `/move`. El motor cuenta sol
 ## Riesgos de arquitectura
 
 El principal riesgo es que una profundidad alta con muchos hilos puede tardar mas de lo esperado si el tablero tiene alto factor de ramificacion. Para mitigarlo, el backend tiene timeout configurable y el motor valida limites de profundidad e hilos. Otro riesgo es que el frontend de nube necesite el dominio final para CORS; por eso los origenes se cargan desde `CORS_ORIGINS` y no se usa `"*"`. Finalmente, la implementacion HTTP del motor es deliberadamente pequena; es adecuada para el proyecto, pero no reemplaza un framework de produccion con TLS, streaming y control avanzado de concurrencia.
+
+
+## Política CORS
+
+### Configuración actual del backend
+
+El backend configura CORS con los siguientes orígenes permitidos:
+
+```python
+CORS_ORIGINS = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://frontend"  # Para comunicación interna en Docker
+]
+
+
+### Headers de respuesta CORS
+
+| Header | Valor | Descripción |
+|--------|-------|-------------|
+| `Access-Control-Allow-Origin` | `http://localhost:8080` | Origen específico permitido |
+| `Access-Control-Allow-Methods` | `GET, POST, OPTIONS` | Métodos HTTP permitidos |
+| `Access-Control-Allow-Headers` | `Accept, Accept-Language, Content-Language, Content-Type` | Headers permitidos |
+| `Access-Control-Max-Age` | `600` | Tiempo de cacheo preflight (10 minutos) |
+
+### Verificación de CORS
+
+```bash
+curl -X OPTIONS http://localhost:8000/move \
+  -H "Origin: http://localhost:8080" \
+  -H "Access-Control-Request-Method: POST" \
+  -v 2>&1 | grep -i "access-control"
+```
+
+**Salida esperada:**
+```
+< access-control-allow-methods: GET, POST, OPTIONS
+< access-control-max-age: 600
+< access-control-allow-headers: Accept, Accept-Language, Content-Language, Content-Type
+< access-control-allow-origin: http://localhost:8080
+```
+
+### Justificación de seguridad
+
+1. **Orígenes explícitos**: No se usa `"*"` para prevenir ataques CSRF y garantizar que solo el frontend autorizado (local o en contenedor) pueda consumir la API.
+
+2. **Métodos restringidos**: Solo `GET`, `POST` y `OPTIONS` (pre-flight) son necesarios; se excluyen `PUT`, `DELETE`, `PATCH` que no forman parte del contrato.
+
+3. **Headers mínimos**: Se permiten solo headers esenciales para la operación del juego.
+
+4. **Entorno de desarrollo**: La configuración actual es para desarrollo local. En producción, los orígenes deben reemplazarse por el dominio real (ej. `https://mancala.dominio.com`).
+
+## Códigos de Error HTTP
+
+| Código | Significado | Escenario | Respuesta Ejemplo |
+|--------|-------------|-----------|-------------------|
+| 200 | OK | Movimiento válido procesado | `{"movimiento": 2, ...}` |
+| 400 | Bad Request | Tablero inválido, movimiento ilegal o payload mal formado | `{"detail": "Invalid board length"}` |
+| 503 | Service Unavailable | Motor no responde o MCTS no implementado | `{"detail": "Motor not reachable"}` |
+| 500 | Internal Server Error | Error inesperado en backend | `{"detail": "Internal server error"}` |
+
+## Esquema Completo de API
+
+### POST /move - Request Completo
+
+```json
+{
+  "tablero": [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0],
+  "lado": 0,
+  "algoritmo": "alphabeta",
+  "parametros": {
+    "profundidad": 8,
+    "simulaciones": 1000,
+    "hilos": 4
+  }
+}
+```
+
+### POST /move - Response Completo (Alpha-Beta)
+
+```json
+{
+  "movimiento": 2,
+  "tablero_nuevo": [4, 4, 0, 5, 5, 5, 1, 4, 4, 4, 4, 4, 4, 0],
+  "lado_siguiente": 0,
+  "terminal": false,
+  "ganador": null,
+  "estadisticas": {
+    "algoritmo": "alphabeta",
+    "tiempo_ms": 1,
+    "hilos": 1,
+    "evaluacion": 0,
+    "profundidad": 6,
+    "nodos": 72,
+    "podas": 18
+  }
+}
+```
+
+### POST /move - Response Completo (MCTS)
+
+```json
+{
+  "movimiento": 2,
+  "tablero_nuevo": [4, 4, 0, 5, 5, 5, 1, 4, 4, 4, 4, 4, 4, 0],
+  "lado_siguiente": 0,
+  "terminal": false,
+  "ganador": null,
+  "estadisticas": {
+    "algoritmo": "mcts",
+    "tiempo_ms": 125,
+    "simulaciones": 1000,
+    "win_rate": 0.62,
+    "rollouts": 1000
+  }
+}
+```
+
+## Diagrama de Secuencia Detallado
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant F as Frontend (Nginx:8080)
+    participant B as Backend (FastAPI:8000)
+    participant M as Motor (C++:8080)
+
+    U->>F: 1. Clic en hoyo (índice 2)
+    F->>F: 2. Validar movimiento básico
+    F->>B: 3. POST /move (lado=0, tablero actual)
+    
+    B->>B: 4. Validar schema y reglas Kalah
+    B->>M: 5. POST /move (mismo payload)
+    
+    M->>M: 6. Calcular mejor movimiento<br/>(Alpha-Beta/MCTS paralelizado)
+    M-->>B: 7. {move: 2, estadisticas}
+    
+    B->>B: 8. Aplicar movimiento al tablero
+    B-->>F: 9. {movimiento, tablero_nuevo, estadisticas}
+    
+    F->>F: 10. Actualizar UI + panel estadísticas
+    F-->>U: 11. Mostrar resultado
+    
+    alt lado_siguiente == 1 (turno IA)
+        F->>B: 12. POST /move automático (lado=1)
+        B->>M: 13. POST /move (lado=1)
+        M-->>B: 14. {move, estadisticas}
+        B-->>F: 15. {tablero_nuevo, estadisticas}
+        F-->>U: 16. Actualizar con jugada IA
+    end
+    
+    alt terminal == true
+        F-->>U: 17. Mostrar mensaje ganador + botón reiniciar
+        U->>F: 18. Clic "Reiniciar"
+        F->>B: 19. POST /reset
+        B-->>F: 20. {status: "ok"}
+        F->>F: 21. Resetear tablero a estado inicial
+    end
+```
+
+## Resumen de Puertos y Comunicación
+
+| Componente | Puerto Interno | Puerto Host | Protocolo | Propósito |
+|------------|---------------|-------------|-----------|-----------|
+| Frontend (Nginx) | 80 | 8080 | HTTP | Servir interfaz web |
+| Backend (FastAPI) | 8000 | 8000 | HTTP | API REST |
+| Motor (C++) | 8080 | 9000 | HTTP | Cálculo de IA |
+
+**Red Docker interna:** `local_default` (bridge)
+- Backend → Motor: `http://motor:8080`
+- Frontend → Backend: `http://backend:8000`

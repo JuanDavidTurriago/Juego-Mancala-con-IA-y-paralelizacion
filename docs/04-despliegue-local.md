@@ -207,3 +207,224 @@ Estos comandos no eliminan el codigo ni modifican la plantilla; solo limpian pro
 ## Guia de pruebas
 
 Si ademas de desplegar necesitas una lista ordenada de comandos para validar el motor, el backend, el frontend y el flujo completo, revisa [TESTING.md](../TESTING.md).
+
+## Dockerfiles
+
+### Frontend Dockerfile (`frontend/Dockerfile`)
+
+```dockerfile
+# Usa imagen oficial de Nginx basada en Alpine Linux (~23MB)
+FROM nginx:1.27-alpine
+
+# Copia el archivo HTML principal al directorio servido por Nginx
+COPY index.html /usr/share/nginx/html/index.html
+
+# Copia la lógica JavaScript del frontend
+COPY app.js /usr/share/nginx/html/app.js
+
+# Copia los estilos CSS
+COPY style.css /usr/share/nginx/html/style.css
+
+# Copia configuración personalizada de Nginx (proxy, CORS, etc.)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expone el puerto 80 (interno del contenedor)
+EXPOSE 80
+# Nota: No hay CMD porque nginx:alpine ya tiene uno por defecto
+```
+
+### Backend Dockerfile (`backend/Dockerfile`)
+
+```dockerfile
+# Usa Python 3.11 slim (~150MB, más ligero que full)
+FROM python:3.11-slim
+
+# Evita generar archivos .pyc (reduce espacio)
+ENV PYTHONDONTWRITEBYTECODE=1
+# Evita buffer de stdout (logs en tiempo real)
+ENV PYTHONUNBUFFERED=1
+
+# Establece directorio de trabajo dentro del contenedor
+WORKDIR /app
+
+# Copia solo requirements.txt primero (optimiza cache de Docker)
+COPY requirements.txt ./requirements.txt
+
+# Instala dependencias sin cache y crea usuario no-root
+RUN pip install --no-cache-dir -r requirements.txt \
+ && useradd -r -u 1001 api
+
+# Copia todo el código fuente de la app
+COPY app ./app
+
+# Variables de entorno por defecto (pueden sobreescribirse)
+ENV MOTOR_URL=http://motor:8080
+ENV MOTOR_TIMEOUT_SECONDS=10
+ENV USE_MOCK=true
+ENV CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://frontend
+
+# Expone puerto de FastAPI
+EXPOSE 8000
+
+# Cambia a usuario no-root (mejora seguridad)
+USER api
+
+# Comando para iniciar el servidor Uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Motor Dockerfile (`motor/Dockerfile`)
+
+```dockerfile
+# ==================== ETAPA 1: COMPILACIÓN ====================
+FROM ubuntu:24.04 AS builder
+
+# Instala herramientas de compilación
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    g++ \
+    libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Establece directorio de trabajo
+WORKDIR /src
+
+# Copia archivos de configuración y código fuente
+COPY CMakeLists.txt ./
+COPY src ./src
+COPY tests ./tests
+COPY bench ./bench
+
+# Configura y compila en modo Release con todos los núcleos
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j \
+ && ctest --test-dir build --output-on-failure
+
+# ==================== ETAPA 2: RUNTIME ====================
+FROM ubuntu:24.04 AS runtime
+
+# Instala runtime libraries (libgomp1 para OpenMP, curl para healthchecks)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgomp1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd -r -u 1001 motor
+
+WORKDIR /app
+
+# Copia binarios compilados desde la etapa builder
+COPY --from=builder /src/build/motor_server /usr/local/bin/motor_server
+COPY --from=builder /src/build/bench /usr/local/bin/bench
+COPY tests/suite.txt /app/tests/suite.txt
+
+# Configura número de hilos OpenMP por defecto
+ENV OMP_NUM_THREADS=4
+
+# Expone puerto del servidor
+EXPOSE 8080
+
+# Cambia a usuario no-root
+USER motor
+
+# Inicia el servidor HTTP del motor
+CMD ["/usr/local/bin/motor_server"]
+```
+
+## docker-compose.yml 
+
+```yaml
+services:
+  # ==================== MOTOR IA (C++) ====================
+  motor:
+    build:
+      context: ../../motor          # Ruta al directorio con Dockerfile y código
+    environment:
+      OMP_NUM_THREADS: "4"          # Hilos OpenMP para paralelización
+    ports:
+      - "9000:8080"                 # Mapea puerto host 9000 → contenedor 8080
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/healthz"]
+      interval: 5s                  # Verifica cada 5 segundos
+      timeout: 3s                   # Timeout por verificación
+      retries: 10                   # Reintentos antes de marcar unhealthy
+      start_period: 5s              # Espera inicial antes de empezar healthchecks
+
+  # ==================== BACKEND (FastAPI) ====================
+  backend:
+    build:
+      context: ../../backend        # Ruta al directorio con Dockerfile y código
+    ports:
+      - "8000:8000"                 # Mapea puerto host 8000 → contenedor 8000
+    environment:
+      MOTOR_URL: "http://motor:8080"           # URL interna al motor
+      MOTOR_TIMEOUT_SECONDS: "10"              # Timeout para peticiones al motor
+      USE_MOCK: "true"                         # Usa mock (true) o motor real (false)
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://frontend"
+    depends_on:
+      motor:
+        condition: service_healthy  # Espera a que motor esté saludable
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ==================== FRONTEND (Nginx) ====================
+  frontend:
+    build:
+      context: ../../frontend        # Ruta al directorio con archivos estáticos
+    ports:
+      - "8080:80"                    # Mapea puerto host 8080 → contenedor 80
+    depends_on:
+      backend:
+        condition: service_healthy   # Espera a que backend esté saludable
+    # Nota: frontend no tiene healthcheck propio en este compose
+```
+
+
+### Captura 1: Contenedores Docker funcionando
+
+![Contenedores Docker funcionando](images/captura1-docker-ps.png)
+
+
+### Captura 2: Prueba de movimiento desde terminal
+
+![Respuesta del motor con curl](images/captura2-curl-move.png)
+
+### Captura 3: Frontend funcionando en navegador
+
+![Frontend tablero de juego](images/captura3-frontend-tablero.png)
+### Captura 4: DevTools - Sin errores CORS
+
+![DevTools Console sin errores](images/captura4-devtools-console.png)
+
+### Captura 5: DevTools - Network con petición exitosa
+
+![DevTools Network petición exitosa](images/captura5-devtools-network.png)
+
+### Captura 6: Panel de estadísticas actualizado
+
+![Panel de estadísticas actualizado](images/captura6-panel-estadisticas.png)
+
+### Captura 7: Fin de juego detectado
+
+![Mensaje de fin de juego y ganador](images/captura7-fin-juego.png)
+
+### Captura 8: Health checks exitosos
+
+![Health checks exitosos](images/captura8-health-checks.png)
+
+## Resumen de Comandos Útiles
+
+| Propósito | Comando |
+|-----------|---------|
+| Levantar todo | `docker compose -f deploy/local/docker-compose.yml up --build` |
+| Ver contenedores | `docker ps` |
+| Ver logs backend | `docker compose -f deploy/local/docker-compose.yml logs backend` |
+| Ver logs motor | `docker compose -f deploy/local/docker-compose.yml logs motor` |
+| Probar backend | `curl http://localhost:8000/healthz` |
+| Probar motor | `curl http://localhost:9000/healthz` |
+| Detener todo | `docker compose -f deploy/local/docker-compose.yml down` |
+| Limpiar todo (incluye volúmenes) | `docker compose -f deploy/local/docker-compose.yml down -v` |
