@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/juandavidturriago/mancala-frontend:v1.0.0
+          image: ghcr.io/juandavidturriago/mancala-frontend:54835ea9507d0d7d2e74902481962420f051438f
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
