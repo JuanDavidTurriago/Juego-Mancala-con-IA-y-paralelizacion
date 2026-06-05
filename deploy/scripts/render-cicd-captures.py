@@ -5,8 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
-
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ModuleNotFoundError as exc:
+    raise SystemExit("Missing dependency 'Pillow' (PIL). Install with: pip install Pillow") from exc
 
 ROOT = Path(__file__).resolve().parents[2]
 IMG_DIR = ROOT / "docs" / "img"
