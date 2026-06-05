@@ -16,11 +16,11 @@ Puertos publicados:
 - `8000`: backend FastAPI.
 - `8080`: frontend web servido por Nginx.
 
-El servicio `motor` define `MOTOR_PORT=9000` y `OMP_NUM_THREADS=4`. El servicio `backend` define `MOTOR_URL=http://motor:9000`, `MOTOR_TIMEOUT_SECONDS=10` y `CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080`. No se define una ruta de respuestas simuladas porque el motor real es parte obligatoria del camino principal. Si el motor no esta sano, el backend debe fallar readiness y no debe inventar una jugada.
+El servicio `motor` ejecuta `motor_server`, que escucha de forma fija en `0.0.0.0:8080`, y define `OMP_NUM_THREADS=4`. Compose publica ese puerto como `9000` en el host (`9000:8080`) para no chocar con el frontend local en `8080`. El servicio `backend` define `MOTOR_URL=http://motor:8080`, `MOTOR_TIMEOUT_SECONDS=10` y `CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080`. No se define una ruta de respuestas simuladas porque el motor real es parte obligatoria del camino principal. Si el motor no esta sano, el backend debe fallar readiness y no debe inventar una jugada.
 
 ## Healthchecks
 
-Compose usa healthchecks para ordenar el arranque. El motor se considera sano cuando `curl -fsS http://localhost:9000/healthz` responde correctamente dentro del contenedor. El backend se considera sano cuando una llamada local a `http://127.0.0.1:8000/healthz` responde. El frontend depende de que el backend este sano antes de arrancar.
+Compose usa healthchecks para ordenar el arranque. El motor se considera sano cuando `curl -fsS http://localhost:8080/healthz` responde correctamente dentro del contenedor; desde el host se prueba con `http://localhost:9000/healthz`. El backend se considera sano cuando una llamada local a `http://127.0.0.1:8000/healthz` responde. El frontend depende de que el backend este sano antes de arrancar.
 
 Esta configuracion no garantiza que todo el trafico real este perfecto, pero reduce errores comunes: backend arrancando antes de que el motor escuche, frontend servido mientras la API aun no esta lista, o pruebas manuales ejecutadas en medio de la construccion.
 
@@ -40,7 +40,7 @@ Luego se prueba el contrato principal por el backend:
 ```bash
 curl -s -X POST http://localhost:8000/move \
   -H "Content-Type: application/json" \
-  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4,0],"side":0,"depth":8,"threads":4}'
+  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4,0],"side":0,"algo":"alphabeta","depth":8,"threads":4}'
 ```
 
 La misma prueba puede enviarse directo al motor para aislar problemas:
@@ -48,7 +48,15 @@ La misma prueba puede enviarse directo al motor para aislar problemas:
 ```bash
 curl -s -X POST http://localhost:9000/move \
   -H "Content-Type: application/json" \
-  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4,0],"side":0,"depth":8,"threads":4}'
+  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4,0],"side":0,"algo":"alphabeta","depth":8,"threads":4}'
+```
+
+Para probar MCTS por el backend:
+
+```bash
+curl -s -X POST http://localhost:8000/move \
+  -H "Content-Type: application/json" \
+  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4,0],"side":0,"algo":"mcts","simulations":1000,"threads":4}'
 ```
 
 Si directo al motor funciona y por backend no, el problema esta en `MOTOR_URL`, red de Compose o timeout. Si ambos fallan, el problema esta en motor, contrato JSON o tablero invalido. Si `/readyz` del backend devuelve `503`, el backend no puede contactar el motor.
@@ -60,20 +68,20 @@ Una solicitud invalida debe fallar. Por ejemplo, un tablero con 13 posiciones de
 ```bash
 curl -i -X POST http://localhost:8000/move \
   -H "Content-Type: application/json" \
-  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4],"side":0,"depth":8,"threads":4}'
+  -d '{"board":[4,4,4,4,4,4,0,4,4,4,4,4,4],"side":0,"algo":"alphabeta","depth":8,"threads":4}'
 ```
 
 Un tablero con 14 posiciones pero total distinto de 48 tambien falla. Esta regla evita que el motor explore posiciones imposibles. En una herramienta de analisis se podria permitir cualquier tablero, pero el proyecto modela partidas de Kalah(6,4), asi que el total de semillas es parte del contrato.
 
 ## Frontend local
 
-El frontend esta disponible en `http://localhost:8080`. Por defecto llama al backend en `http://localhost:8000`. La UI permite editar el arreglo del tablero, seleccionar `side`, `depth` y `threads`, y enviar la solicitud. Tambien pinta stores y pits para que sea mas facil detectar errores de indices. El navegador solo puede llamar al backend si CORS permite explicitamente el origen local; por eso el backend configura `http://localhost:8080` y `http://127.0.0.1:8080` en lugar de `"*"`.
+El frontend esta disponible en `http://localhost:8080`. Por defecto llama al backend en `http://localhost:8000`. La UI permite editar el arreglo del tablero, seleccionar `side`, algoritmo, `depth` o `simulations`, `threads`, y enviar la solicitud. Tambien pinta stores y pits para que sea mas facil detectar errores de indices. El navegador solo puede llamar al backend si CORS permite explicitamente el origen local; por eso el backend configura `http://localhost:8080` y `http://127.0.0.1:8080` en lugar de `"*"`.
 
 ## Kubernetes local (kind)
 
 Los manifiestos estan en `deploy/local/k8s/`:
 
-- `configmap.yaml`: `MOTOR_URL=http://motor-svc:8080`, `MOTOR_PORT=8080`, CORS y timeouts.
+- `configmap.yaml`: `MOTOR_URL=http://motor-svc:8080`, `OMP_NUM_THREADS`, `DEFAULT_DEPTH`, CORS y timeouts.
 - `motor.yaml`: Deployment (2 replicas) y Service `motor-svc` (ClusterIP, puerto 8080).
 - `backend.yaml`: Deployment con **3 replicas** y Service `backend` (NodePort).
 - `frontend.yaml`: Deployment (2 replicas) y Service `frontend` (NodePort `30080`).
@@ -178,7 +186,7 @@ kubectl logs deployment/backend --tail=200
 kubectl logs deployment/motor --tail=200
 ```
 
-Si el motor arranca pero las busquedas tardan demasiado, bajar `depth` o `threads` en la solicitud. Para pruebas de humo se recomienda `depth=4`; para evidencia de rendimiento se recomienda `depth=8` o superior, siempre observando los recursos disponibles.
+Si el motor arranca pero las busquedas tardan demasiado, bajar `depth`, `simulations` o `threads` en la solicitud. Para pruebas de humo se recomienda `depth=4` en Alpha-Beta o `simulations=1000` en MCTS; para evidencia de rendimiento se recomienda `depth=8` o superior, siempre observando los recursos disponibles.
 
 ## Limpieza
 

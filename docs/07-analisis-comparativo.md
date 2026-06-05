@@ -2,7 +2,7 @@
 
 ## Proposito
 
-El analisis comparativo busca responder si la paralelizacion con OpenMP mejora el tiempo de busqueda del motor y bajo que condiciones. La comparacion no se debe hacer a traves del frontend ni del backend, porque la latencia HTTP, el navegador, Docker networking y FastAPI agregan ruido. Por eso se usa `mancala_bench`, un ejecutable del motor que corre directamente sobre posiciones fijas y reporta datos en CSV.
+El analisis comparativo busca responder si la paralelizacion con OpenMP mejora el tiempo de busqueda del motor y bajo que condiciones. La comparacion no se debe hacer a traves del frontend ni del backend, porque la latencia HTTP, el navegador, Docker networking y FastAPI agregan ruido. Por eso se usa `bench`, un ejecutable del motor que corre directamente sobre posiciones fijas y reporta tablas de tiempo, speedup, eficiencia, nodos y podas.
 
 La unidad de comparacion es la misma posicion de Kalah, misma profundidad, mismo algoritmo Alfa-Beta y distinto numero de hilos. Para cada posicion se toma `T(1)` como linea base y se calculan:
 
@@ -20,26 +20,28 @@ Despues de compilar el motor:
 ```bash
 cmake -S motor -B motor/build -DCMAKE_BUILD_TYPE=Release
 cmake --build motor/build -j
-./motor/build/mancala_bench --depth 8 --positions motor/tests/suite.txt --threads 1,2,4,8
+./motor/build/bench --algo alphabeta --depth 8 --positions motor/tests/suite.txt
+./motor/build/bench --algo mcts --simulations 1000 --positions motor/tests/suite.txt
 ```
 
-La salida tiene columnas:
+La salida incluye una tabla para la ejecucion secuencial pura y otra para root parallelism con `1`, `2`, `4` y `8` hilos:
 
 ```text
-position,depth,threads,move,evaluation,elapsed_ms,speedup,efficiency,nodes,prunes
+threads | T(p) ms | S(p) | E(p) | nodes_avg | prunes_avg
 ```
 
 Para una tabla de informe se recomienda guardar la salida:
 
 ```bash
-./motor/build/mancala_bench --depth 8 --positions motor/tests/suite.txt --threads 1,2,4,8 > bench-depth8.csv
+./motor/build/bench --algo alphabeta --depth 8 --positions motor/tests/suite.txt > bench-depth8.txt
 ```
 
 En Debian 12 o cualquier Linux con Docker se puede construir la imagen del motor y ejecutar el benchmark dentro del contenedor:
 
 ```bash
 docker build -t mancala-motor:bench ./motor
-docker run --rm mancala-motor:bench /usr/local/bin/mancala_bench --depth 8 --positions /app/tests/suite.txt --threads 1,2,4,8
+docker run --rm mancala-motor:bench /usr/local/bin/bench --algo alphabeta --depth 8 --positions /app/tests/suite.txt
+docker run --rm mancala-motor:bench /usr/local/bin/bench --algo mcts --simulations 1000 --positions /app/tests/suite.txt
 ```
 
 ## Posiciones
@@ -83,10 +85,10 @@ La profundidad debe elegirse para que `T(1)` sea medible pero no excesivo. Si `d
 
 ## Limitaciones
 
-El benchmark mide una implementacion concreta de root parallelism. No prueba que sea la mejor estrategia posible. Tecnicas como ordenamiento avanzado de movimientos, tablas de transposicion, iterative deepening o Young Brothers Wait Concept podrian cambiar el resultado. Tampoco se modelan multiples solicitudes concurrentes al motor; cada fila del benchmark es una busqueda aislada.
+El benchmark de Alpha-Beta mide una implementacion concreta de root parallelism. No prueba que sea la mejor estrategia posible. Tecnicas como ordenamiento avanzado de movimientos, tablas de transposicion, iterative deepening o Young Brothers Wait Concept podrian cambiar el resultado. El modo MCTS mide el costo promedio de rollouts para un presupuesto fijo de simulaciones, pero no es una comparacion de paralelismo porque la version actual de MCTS es secuencial. Tampoco se modelan multiples solicitudes concurrentes al motor; cada fila del benchmark es una busqueda aislada.
 
 Otra limitacion es el uso de elapsed time de pared. En ambientes virtualizados, Docker Desktop puede compartir CPU con otros procesos y producir variaciones fuertes. Para una sustentacion se debe hablar de tendencia, no prometer speedups universales. Lo defendible es mostrar que existe `#pragma omp`, que el numero de hilos afecta la ejecucion, que las estadisticas se reportan y que las conclusiones reconocen overhead y desbalance.
 
 ## Relacion con el backend
 
-El backend tambien expone `elapsed_ms`, `nodes`, `prunes` y `threads_used` en cada respuesta de `/move`. Esos datos sirven para depuracion y demostraciones rapidas desde la UI. Sin embargo, no reemplazan el benchmark porque incluyen red, serializacion JSON y planificacion del servidor. El analisis formal debe basarse en `mancala_bench`; la API se usa para demostrar integracion distribuida.
+El backend tambien expone `elapsed_ms`, `nodes`, `prunes` y `threads_used` en cada respuesta de `/move`. Esos datos sirven para depuracion y demostraciones rapidas desde la UI. Sin embargo, no reemplazan el benchmark porque incluyen red, serializacion JSON y planificacion del servidor. El analisis formal debe basarse en `bench`; la API se usa para demostrar integracion distribuida.

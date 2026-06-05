@@ -26,13 +26,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && useradd -r -u 1001 motor
 
 WORKDIR /app
-COPY --from=builder /src/build/mancala_engine /usr/local/bin/mancala_engine
+COPY --from=builder /src/build/motor_server /usr/local/bin/motor_server
 COPY --from=builder /src/build/bench /usr/local/bin/bench
 COPY tests/suite.txt /app/tests/suite.txt
 
-ENV MOTOR_PORT=9000
 ENV OMP_NUM_THREADS=4
-EXPOSE 9000
+EXPOSE 8080
 
 USER motor
-CMD ["/usr/local/bin/mancala_engine"]
+CMD ["/usr/local/bin/motor_server"]

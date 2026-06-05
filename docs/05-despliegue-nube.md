@@ -26,7 +26,7 @@ La diferencia entre request y limit permite que Kubernetes reserve capacidad min
 
 ## Servicios internos
 
-El Service `motor` es `ClusterIP` y escucha en `9000`. Solo el backend necesita llamarlo. El Service `backend` tambien es `ClusterIP` en nube; queda expuesto por Ingress bajo el host `api.mancala.example.edu.co`. El Service `frontend` se expone por Ingress bajo `mancala.example.edu.co`.
+El Service `motor` es `ClusterIP` y escucha en `8080`, el mismo puerto interno del binario `motor_server`. Solo el backend necesita llamarlo. El Service `backend` tambien es `ClusterIP` en nube; queda expuesto por Ingress bajo el host `api.mancala.example.edu.co`. El Service `frontend` se expone por Ingress bajo `mancala.example.edu.co`.
 
 Esta separacion de host simplifica CORS. El navegador entra por `https://mancala.example.edu.co` y llama al backend en `https://api.mancala.example.edu.co`. El ConfigMap define `CORS_ORIGINS=https://mancala.example.edu.co`, que es un origen explicito y evita usar `"*"`.
 

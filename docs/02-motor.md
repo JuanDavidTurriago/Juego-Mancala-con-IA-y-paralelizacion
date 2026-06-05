@@ -8,7 +8,7 @@ El motor usa la representacion canonica de Kalah(6,4) con 14 posiciones. Los pit
 [4,4,4,4,4,4,0,4,4,4,4,4,4,0]
 ```
 
-La estructura `Board` vive en `motor/src/board.h` y guarda un `std::array<int, 14>` junto con `side_to_move`. Se prefirio `std::array` sobre un vector dinamico porque el tamano del tablero nunca cambia y porque permite copias baratas y predecibles durante la busqueda. Cada nodo del arbol crea una copia del tablero al aplicar un movimiento; esto simplifica la implementacion de minimax y evita estado compartido entre ramas paralelas.
+La estructura `Board` vive en `motor/src/board.h` y guarda un arreglo plano `int pits[14]` junto con `side_to_move`. Se usa un arreglo fijo porque el tamano del tablero nunca cambia, no requiere memoria dinamica y permite copias baratas durante la busqueda. Cada nodo del arbol crea una copia del tablero al aplicar un movimiento; esto simplifica la implementacion de minimax y evita estado compartido entre ramas paralelas.
 
 El motor valida invariantes importantes. El total de semillas debe ser 48, los pits no pueden ser negativos y el lado activo debe ser `0` o `1`. En modo debug, `apply_move` verifica con `assert` que el total de semillas antes y despues de la jugada se conserva. Esta clase de prueba es valiosa porque los errores en captura o barrido suelen manifestarse como semillas perdidas o duplicadas.
 
@@ -28,34 +28,103 @@ La funcion `evaluate` calcula una heuristica desde la perspectiva del jugador 0.
 score = store_diff + pit_weight * pit_diff
 ```
 
-Por defecto `pit_weight` vale `0.5`. La diferencia de stores es el indicador mas fuerte porque esas semillas ya no se pueden perder. La diferencia de pits agrega informacion sobre movilidad y potencial de capturas, pero tiene menor peso porque esas semillas aun estan en juego. En posiciones terminales se retorna un valor alto positivo si gana jugador 0, alto negativo si gana jugador 1 y cero si hay empate.
+Por defecto `pit_weight` vale `0.5`. La diferencia de stores es el indicador mas fuerte porque esas semillas ya no se pueden perder. La diferencia de pits agrega informacion sobre movilidad y potencial de capturas, pero tiene menor peso porque esas semillas aun estan en juego. En posiciones terminales se retorna `INT_MAX` si gana jugador 0, `INT_MIN` si gana jugador 1 y cero si hay empate.
 
-La clase `AlphaBetaEngine` convierte esta evaluacion a la perspectiva del jugador que pidio la busqueda. Si `side_to_move` es `1`, invierte el signo. Asi el algoritmo siempre maximiza desde el punto de vista del jugador activo, y el backend no tiene que reinterpretar la evaluacion.
+Las funciones de Alpha-Beta usan esta evaluacion como contrato global: positivo favorece al jugador 0 y negativo favorece al jugador 1. En la raiz, jugador 0 maximiza y jugador 1 minimiza.
 
 ## Busqueda Alfa-Beta
 
 El motor implementa minimax con poda Alfa-Beta. En cada nodo se generan movimientos legales, se aplica cada movimiento a una copia del tablero y se llama recursivamente hasta alcanzar profundidad cero o una posicion terminal. Si el turno del tablero coincide con el jugador de referencia, el nodo maximiza; si el turno es del rival, minimiza. La poda ocurre cuando `alpha >= beta`, y cada corte incrementa `stats.prunes`.
 
-La busqueda cuenta nodos en `stats.nodes`. El nodo raiz se contabiliza una vez y cada llamada recursiva incrementa el contador local. El resultado final incluye:
+Pseudocodigo de Minimax puro usado como oraculo de correccion:
+
+```text
+minimax(board, depth, is_max):
+  si depth == 0 o is_terminal(board):
+    retornar evaluate(board)
+
+  si is_max:
+    best = -infinito
+    para mv en legal_moves(board):
+      next, extra = apply_move(board, mv)
+      next_is_max = is_max si extra, si no !is_max
+      best = max(best, minimax(next, depth - 1, next_is_max))
+    retornar best
+
+  best = +infinito
+  para mv en legal_moves(board):
+    next, extra = apply_move(board, mv)
+    next_is_max = is_max si extra, si no !is_max
+    best = min(best, minimax(next, depth - 1, next_is_max))
+  retornar best
+```
+
+Pseudocodigo de Alfa-Beta:
+
+```text
+alphabeta(board, depth, alpha, beta, is_max):
+  nodes++
+  si depth == 0 o is_terminal(board):
+    retornar evaluate(board)
+
+  si is_max:
+    best = -infinito
+    para mv en legal_moves(board):
+      next, extra = apply_move(board, mv)
+      child_is_max = is_max si extra, si no !is_max
+      best = max(best, alphabeta(next, depth - 1, alpha, beta, child_is_max))
+      alpha = max(alpha, best)
+      si alpha >= beta:
+        prunes++
+        cortar
+    retornar best
+
+  best = +infinito
+  para mv en legal_moves(board):
+    next, extra = apply_move(board, mv)
+    child_is_max = is_max si extra, si no !is_max
+    best = min(best, alphabeta(next, depth - 1, alpha, beta, child_is_max))
+    beta = min(beta, best)
+    si beta <= alpha:
+      prunes++
+      cortar
+  retornar best
+```
+
+La regla critica es el turno extra: si `apply_move` retorna `extra_turn=true`, el siguiente nodo conserva el mismo rol MAX/MIN. Alternar incondicionalmente despues de cada jugada seria incorrecto en Kalah, porque una semilla final en el kalaha propio permite que el mismo jugador vuelva a mover.
+
+La busqueda cuenta nodos en `nodes`. Cada llamada recursiva a `alphabeta` incrementa el contador local. El resultado final incluye:
 
 - `move`: mejor pit absoluto encontrado.
-- `evaluation`: valor heuristico desde la perspectiva del jugador activo.
-- `stats.nodes`: nodos explorados.
-- `stats.prunes`: cortes Alfa-Beta.
+- `value`: valor heuristico desde la perspectiva global del tablero.
+- `nodes`: nodos explorados.
+- `prunes`: cortes Alfa-Beta.
 - `threads_used`: hilos realmente creados por OpenMP.
 
 El desempate entre movimientos con igual evaluacion favorece el pit de menor indice. Esto hace que la respuesta sea deterministica y permite comparar ejecuciones secuenciales y paralelas sin ruido por orden de planificacion.
 
+Evidencia de correccion: `test_alphabeta.cpp` compara Minimax puro contra Alfa-Beta sobre posiciones de prueba a profundidades 4 y 6. La corrida actual reporta:
+
+| Test | Resultado |
+|------|-----------|
+| Equivalencia Minimax == Alpha-Beta | PASS |
+| Turno extra respetado | PASS |
+| Terminal positivo para P1 | PASS |
+| `prunes > 0` | PASS |
+| Alpha-Beta explora menos nodos que Minimax | PASS |
+
 ## Servidor HTTP
 
-El ejecutable `mancala_engine` levanta un servidor HTTP en el puerto `MOTOR_PORT`, con valor por defecto `9000`. Expone `GET /healthz`, `GET /readyz`, `GET /metrics` y `POST /move`. El parser JSON es pequeno y especifico al contrato de la entrega: busca los campos `board`, `side`, `depth` y `threads`, valida rangos y responde errores `400` cuando la solicitud no cumple.
+El ejecutable `motor_server` levanta un servidor HTTP con `cpp-httplib` en `0.0.0.0:8080`. Expone `GET /healthz`, `GET /readyz`, `GET /metrics` y `POST /move`. La ruta `/healthz` responde siempre `{"status":"ok"}` mientras el proceso viva. La ruta `/readyz` responde `{"status":"ready"}` cuando el servidor termino de registrar rutas e inicializar el flag atomico global de readiness.
 
-No se agrego una dependencia externa de JSON para mantener el Dockerfile y el CI simples. La API publica sigue usando JSON estandar y el backend hace una segunda capa de validacion con Pydantic. En un motor de produccion convendria usar una libreria como `nlohmann/json` o exponer gRPC, pero para esta entrega el contrato es fijo y el parser acotado reduce dependencias.
+`POST /move` parsea el cuerpo con `nlohmann/json`. El contrato recibe `board`, `side`, `algo`, `depth`, `simulations` y `threads`. El servidor reconstruye un `Board` desde el arreglo, valida que tenga exactamente 14 enteros no negativos y que la suma sea 48. Si el tablero no cumple, responde `400 {"error":"invalid board"}`. Si el algoritmo es desconocido, responde `400 {"error":"unknown algo"}`. Errores internos no controlados responden `500`.
+
+Para `algo="alphabeta"`, el servidor llama `best_move_parallel(board, depth, threads)`. Para `algo="mcts"`, llama `best_move_mcts(board, simulations, 1.41421f)`. El tiempo de busqueda se mide con `omp_get_wtime()` alrededor de la llamada al motor y se reporta como `elapsed_ms`. La respuesta mantiene el contrato que consume el backend: `move`, `evaluation`, `elapsed_ms`, `stats` y `threads_used`.
 
 ## Pruebas unitarias
 
-`motor/tests/test_board.cpp` cubre estado inicial, conservacion de semillas, turno extra, salto del store rival, captura y barrido de final de partida. `motor/tests/test_alphabeta.cpp` verifica que la posicion inicial produce un movimiento legal, que la busqueda visita nodos y que la ejecucion paralela coincide con la secuencial en movimiento y evaluacion para una profundidad fija. El `CMakeLists.txt` registra ambas pruebas con `add_test`, por lo que `ctest --test-dir motor/build --output-on-failure` las ejecuta en CI.
+`motor/tests/test_board.cpp` cubre estado inicial, conservacion de semillas, turno extra, salto del store rival, captura, no-captura con opuesto vacio y barrido de final de partida. `motor/tests/test_alphabeta.cpp` compara Minimax contra Alpha-Beta, valida terminales, podas y equivalencia entre ejecucion secuencial y paralela. `motor/tests/test_mcts.cpp` valida jugadas legales, convergencia basica, comparacion reportada contra Alpha-Beta y que los rollouts coincidan con `simulations`. El `CMakeLists.txt` registra estas pruebas con `add_test`, por lo que `ctest --test-dir motor/build --output-on-failure` las ejecuta en CI.
 
 ## Benchmark
 
-`motor/bench/bench.cpp` construye el ejecutable `mancala_bench`. Lee posiciones desde `motor/tests/suite.txt`, ejecuta Alfa-Beta con profundidades configurables y compara hilos `1,2,4,8` o la lista indicada por `--threads`. La salida CSV incluye tiempo, speedup, eficiencia, nodos y podas. Esta herramienta es la base del analisis comparativo porque mide el motor sin pasar por red, frontend ni backend.
+`motor/bench/bench.cpp` construye el ejecutable `bench`. Lee posiciones desde `motor/tests/suite.txt`. Con `--algo alphabeta` ejecuta Alpha-Beta con profundidades configurables y compara hilos `1,2,4,8`; la salida incluye tiempo, speedup, eficiencia, nodos y podas. Con `--algo mcts` ejecuta MCTS con el presupuesto de simulaciones indicado y reporta tiempo promedio, rollouts, win rate y profundidad promedio de rollout. Esta herramienta mide el motor sin pasar por red, frontend ni backend.

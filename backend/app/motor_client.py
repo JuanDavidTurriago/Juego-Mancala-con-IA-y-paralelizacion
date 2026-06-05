@@ -15,7 +15,7 @@ class MotorUnavailable(Exception):
 
 @dataclass
 class MotorClient:
-    motor_url: str = os.getenv("MOTOR_URL", "http://localhost:9000")
+    motor_url: str = os.getenv("MOTOR_URL", "http://localhost:8080")
     timeout_seconds: float = float(os.getenv("MOTOR_TIMEOUT_SECONDS", "10"))
     use_mock: bool = os.getenv("USE_MOCK", "false").lower() == "true"
 

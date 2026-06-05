@@ -8,22 +8,25 @@ Esta estrategia se conoce como root parallelism. Es sencilla, segura y adecuada 
 
 ## Implementacion OpenMP
 
-La funcion `AlphaBetaEngine::SearchBestMove` recibe `depth` y `threads`. Primero genera los movimientos legales. Si no hay movimientos o la profundidad es cero, evalua directamente. Si hay movimientos, inicializa contadores compartidos para nodos y podas y entra a una region paralela:
+La funcion `best_move_parallel(const Board& board, int depth, int nthreads)` recibe la posicion, la profundidad y el numero de hilos solicitados. Primero genera los movimientos legales de la raiz. Si no hay movimientos o la profundidad es cero, evalua directamente. Si hay movimientos, crea una region paralela y reparte cada jugada raiz entre los hilos:
 
 ```cpp
-#pragma omp parallel num_threads(requested_threads) reduction(+ : total_nodes, total_prunes)
+#pragma omp parallel num_threads(requested_threads)
 {
   #pragma omp single
   { threads_used = omp_get_num_threads(); }
 
-  #pragma omp for schedule(dynamic)
+  #pragma omp for schedule(dynamic, 1)
   for (int i = 0; i < moves.size(); ++i) {
-    // busqueda Alfa-Beta de la rama moves[i]
+    int local_nodes = 0;
+    int local_prunes = 0;
+    // busqueda Alfa-Beta secuencial de la rama moves[i]
+    results[i] = {moves[i], value, local_nodes, local_prunes};
   }
 }
 ```
 
-La reduccion suma `total_nodes` y `total_prunes` sin bloquear en cada nodo. La seccion critica solo protege la comparacion entre el resultado de una rama y el mejor resultado global. Ese bloqueo es barato porque ocurre una vez por movimiento raiz, no una vez por nodo interno.
+Cada hilo acumula `local_nodes` y `local_prunes` para su rama. Al terminar la region paralela, el hilo principal suma los resultados y elige el mejor movimiento de forma deterministica, con desempate por menor indice de hoyo. No hay una seccion critica en cada nodo ni contadores compartidos durante la recursion.
 
 Cada rama recibe una copia del tablero producida por `apply_move`. No hay escritura concurrente sobre el tablero raiz ni sobre tableros hijos compartidos. Esta propiedad hace que el algoritmo sea naturalmente thread-safe. El unico estado compartido dentro de la busqueda es el mejor movimiento raiz, y se actualiza de forma controlada.
 
@@ -35,23 +38,19 @@ La solucion mantiene la poda dentro de cada rama. Es decir, no se elimina Alfa-B
 
 ## Medicion
 
-El benchmark imprime una tabla CSV con estas columnas:
+El benchmark imprime tablas agregadas por todas las posiciones cargadas desde `suite.txt`. Las columnas principales son:
 
-- `position`: indice de la posicion cargada desde `suite.txt`.
-- `depth`: profundidad usada.
 - `threads`: hilos solicitados.
-- `move`: mejor movimiento devuelto.
-- `evaluation`: evaluacion del movimiento.
-- `elapsed_ms`: tiempo de busqueda.
+- `T(p) ms`: tiempo promedio de busqueda.
 - `speedup`: `T(1) / T(p)`.
 - `efficiency`: `speedup / p`.
-- `nodes`: nodos explorados.
-- `prunes`: cortes realizados.
+- `nodes_avg`: nodos explorados en promedio.
+- `prunes_avg`: cortes realizados en promedio.
 
 El comando recomendado es:
 
 ```bash
-./motor/build/mancala_bench --depth 8 --positions motor/tests/suite.txt --threads 1,2,4,8
+./motor/build/bench --algo alphabeta --depth 8 --positions motor/tests/suite.txt
 ```
 
 Para profundidades pequenas, el overhead de crear la region paralela y sincronizar resultados puede dominar. En ese caso `T(4)` puede ser similar o incluso peor que `T(1)`. Para profundidades medias, el trabajo por rama crece y se espera ver mejor aprovechamiento de hilos. Para profundidades muy altas, el tiempo puede crecer mucho por el factor de ramificacion y por tableros que no permiten podas tempranas.

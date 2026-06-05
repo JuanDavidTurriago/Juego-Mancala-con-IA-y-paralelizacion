@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(mancala_engine CXX)
+project(mancala_motor CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,9 +23,10 @@ target_link_libraries(mancala_core PUBLIC OpenMP::OpenMP_CXX)
 add_executable(bench bench/bench.cpp)
 target_link_libraries(bench PRIVATE mancala_core)
 
-if(NOT WIN32)
-    add_executable(mancala_engine src/server.cpp)
-    target_link_libraries(mancala_engine PRIVATE mancala_core)
+add_executable(motor_server src/server.cpp)
+target_link_libraries(motor_server PRIVATE mancala_core)
+if(WIN32)
+    target_link_libraries(motor_server PRIVATE ws2_32)
 endif()
 
 enable_testing()

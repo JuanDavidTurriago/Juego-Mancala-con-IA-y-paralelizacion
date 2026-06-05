@@ -59,13 +59,15 @@ Si quieres correr un binario puntual:
 ### Ejecutar el benchmark
 
 ```bash
-./motor/build/mancala_bench --depth 8 --positions motor/tests/suite.txt --threads 1,2,4,8
+./motor/build/bench --algo alphabeta --depth 8 --positions motor/tests/suite.txt
+./motor/build/bench --algo mcts --simulations 1000 --positions motor/tests/suite.txt
 ```
 
-Para guardar la salida en CSV:
+Para guardar la salida del benchmark:
 
 ```bash
-./motor/build/mancala_bench --depth 8 --positions motor/tests/suite.txt --threads 1,2,4,8 > bench-depth8.csv
+./motor/build/bench --algo alphabeta --depth 8 --positions motor/tests/suite.txt > bench-depth8.txt
+./motor/build/bench --algo mcts --simulations 1000 --positions motor/tests/suite.txt > bench-mcts-1000.txt
 ```
 
 ## 3. Pruebas del backend
@@ -78,7 +80,7 @@ Esto sirve mientras el motor HTTP real no esta disponible:
 
 ```bash
 cd backend
-USE_MOCK=true MOTOR_URL=http://localhost:9000 ~/.local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+USE_MOCK=true MOTOR_URL=http://localhost:8080 ~/.local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Ejecutar los tests del backend

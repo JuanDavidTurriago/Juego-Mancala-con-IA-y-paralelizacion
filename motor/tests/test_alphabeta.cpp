@@ -1,4 +1,4 @@
-#include "alphabeta.h"
+#include "../src/alphabeta.h"
 
 #include <algorithm>
 #include <climits>
@@ -20,7 +20,9 @@ bool expect_true(bool condition, const std::string& message) {
 
 Board empty_board(int side_to_move = 0) {
     Board board;
-    board.pits.fill(0);
+    for (int i = 0; i < kBoardSize; ++i) {
+        board.pits[i] = 0;
+    }
     board.side_to_move = side_to_move;
     return board;
 }
@@ -191,7 +193,7 @@ bool test_terminal_returns_extreme_value() {
     ABResult result = best_move_alphabeta(board, 5);
     bool ok = true;
     ok &= expect_true(is_terminal(board), "manual board must be terminal");
-    ok &= expect_true(result.value > 0, "P1 terminal win must be positive");
+    ok &= expect_true(result.value == INT_MAX, "P1 terminal win must return INT_MAX");
     return ok;
 }
 

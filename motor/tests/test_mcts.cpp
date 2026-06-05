@@ -8,10 +8,12 @@
 // quiere migrar, cada función test_* se convierte directamente en un TEST().
 // ─────────────────────────────────────────────────────────────────────────────
 
-#include "mcts.h"
-#include "board.h"
-#include "alphabeta.h"
+#include "../src/mcts.h"
+#include "../src/board.h"
+#include "../src/alphabeta.h"
 
+#include <algorithm>
+#include <cstdio>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,6 +34,12 @@ bool expect_true(bool condition, const char* message) {
   return true;
 }
 
+void set_pits(Board& board, const int values[kBoardSize]) {
+  for (int i = 0; i < kBoardSize; ++i) {
+    board.pits[i] = values[i];
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: construye un Board desde una línea de suite.txt
 // Formato: p0,p1,p2,p3,p4,p5,K0,p6,p7,p8,p9,p10,p11,K1,side
@@ -39,23 +47,23 @@ bool expect_true(bool condition, const char* message) {
 // Nota: en suite.txt la columna K0 es el índice 6 (almacén jugador 0)
 //       y K1 es el índice 13 (almacén jugador 1).
 // ─────────────────────────────────────────────────────────────────────────────
-bool parse_board(const std::string& line, Board& board, int default_side = 0) {
+bool parse_board(std::string line, Board& board, int default_side = 0) {
+  std::replace(line.begin(), line.end(), ',', ' ');
   std::istringstream ss(line);
-  std::string token;
-  int idx = 0;
-  board = Board{};   // reset
-  while (std::getline(ss, token, ',')) {
-    if (idx >= 14) {
-      // Campo adicional opcional: side_to_move
-      try { board.side_to_move = std::stoi(token); } catch (...) {}
-      break;
-    }
-    try { board.pits[idx] = std::stoi(token); } catch (...) { return false; }
-    ++idx;
+  std::vector<int> values;
+  int value = 0;
+  while (ss >> value) {
+    values.push_back(value);
   }
-  if (idx != 14) return false;
-  if (board.side_to_move == 0) board.side_to_move = default_side;
-  return true;
+
+  if (values.size() != 14 && values.size() != 15) return false;
+
+  board = Board{};
+  for (int i = 0; i < 14; ++i) {
+    board.pits[i] = values[i];
+  }
+  board.side_to_move = values.size() == 15 ? values[14] : default_side;
+  return board.side_to_move == 0 || board.side_to_move == 1;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +175,8 @@ bool test_convergence() {
 
   Board board;
   //       p0 p1 p2 p3 p4 p5  K0   p7 p8 p9 p10 p11 p12   K1
-  board.pits = {0, 0, 0, 0, 1, 1,  20,  8,  0,  0,   0,   0,   0,  18};
+  const int pits[] = {0, 0, 0, 0, 1, 1,  20,  8,  0,  0,   0,   0,   0,  18};
+  set_pits(board, pits);
   board.side_to_move = 0;
   // Total: 0+0+0+0+1+1+20+8+0+0+0+0+0+18 = 48 ✓
   // pit5 (idx 5): 1 seed → K0=21 (extra turn). pit4 (1 seed → pit5). pit5 was 0
@@ -216,14 +225,14 @@ bool test_convergence() {
 // Lee las posiciones de suite.txt y compara:
 //   best_move_mcts(pos, 10000, √2).move
 //   vs.
-//   AlphaBetaEngine().SearchBestMove(pos, 8).move
+//   best_move_alphabeta(pos, 8).move
 //
 // Reporta la tasa de coincidencia. El enunciado sólo pide REPORTAR el %,
 // no superar un umbral. El test se marca PASS si suite.txt se cargó
 // correctamente y la comparación se completó sin errores.
 //
-// ⚠ DEPENDENCIA DE P1: Si best_move_alphabeta() / AlphaBetaEngine no está
-//   disponible en el proyecto, este test no compilará. En ese caso:
+// ⚠ DEPENDENCIA DE P1: Si best_move_alphabeta() no está disponible en el
+//   proyecto, este test no compilará. En ese caso:
 //   1. Comentar el bloque marcado con [INYECTAR-P1-AQUÍ].
 //   2. Descomentar el stub hardcodeado que simplemente retorna PASS vacío.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,7 +240,7 @@ bool test_match_rate_vs_alphabeta() {
   std::cout << "[Test 3] Tasa de coincidencia MCTS vs AlphaBeta\n";
 
   // [INYECTAR-P1-AQUÍ] ── Inicio de bloque dependiente de AlphaBeta ─────────
-  // Si AlphaBetaEngine no está disponible, comenta desde aquí hasta [FIN-P1].
+  // Si best_move_alphabeta no está disponible, comenta desde aquí hasta [FIN-P1].
 
   const auto suite = load_suite("suite.txt");
   if (suite.empty()) {
@@ -239,7 +248,6 @@ bool test_match_rate_vs_alphabeta() {
     return true;  // No bloqueamos el test si no hay suite
   }
 
-  AlphaBetaEngine ab_engine;
   const int ab_depth  = 8;
   const int mcts_sims = 10000;
 
@@ -251,7 +259,7 @@ bool test_match_rate_vs_alphabeta() {
     ++total;
 
     // Movimiento de AlphaBeta con profundidad 8
-    const auto ab_res   = ab_engine.SearchBestMove(pos, ab_depth, 1);
+    const ABResult ab_res = best_move_alphabeta(pos, ab_depth);
     // Movimiento de MCTS con 10,000 simulaciones
     const auto mcts_res = best_move_mcts(pos, mcts_sims, 1.41421f);
 
@@ -302,7 +310,8 @@ bool test_rollouts_equals_simulations() {
   {
     Board board;
     // Posición con pocos movimientos disponibles (endgame)
-    board.pits = {0, 0, 0, 0, 0, 3, 30, 1, 2, 0, 4, 3, 0, 5};
+    const int pits[] = {0, 0, 0, 0, 0, 3, 30, 1, 2, 0, 4, 3, 0, 5};
+    set_pits(board, pits);
     board.side_to_move = 0;
     auto res = best_move_mcts(board, 200, 1.41421f);
     ok &= expect_true(res.rollouts == 200,

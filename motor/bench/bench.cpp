@@ -1,7 +1,9 @@
 #include "alphabeta.h"
 #include "board.h"
+#include "mcts.h"
 
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -22,6 +24,13 @@ struct AvgStats {
     double elapsed_ms = 0.0;
     double nodes = 0.0;
     double prunes = 0.0;
+};
+
+struct MCTSAvgStats {
+    double elapsed_ms = 0.0;
+    double rollouts = 0.0;
+    double win_rate = 0.0;
+    double tree_depth_avg = 0.0;
 };
 
 void print_usage() {
@@ -133,6 +142,27 @@ AvgStats average_parallel(const std::vector<Board>& positions, int depth, int th
     return stats;
 }
 
+MCTSAvgStats average_mcts(const std::vector<Board>& positions, int simulations) {
+    MCTSAvgStats stats;
+    for (const Board& pos : positions) {
+        const auto t0 = std::chrono::steady_clock::now();
+        MCTSResult result = best_move_mcts(pos, simulations, 1.41421f);
+        const auto t1 = std::chrono::steady_clock::now();
+
+        stats.elapsed_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+        stats.rollouts += result.rollouts;
+        stats.win_rate += result.win_rate;
+        stats.tree_depth_avg += result.tree_depth_avg;
+    }
+
+    const double count = static_cast<double>(positions.size());
+    stats.elapsed_ms /= count;
+    stats.rollouts /= count;
+    stats.win_rate /= count;
+    stats.tree_depth_avg /= count;
+    return stats;
+}
+
 void print_row(const std::string& label, const AvgStats& stats, double speedup, double efficiency) {
     std::cout << std::setw(7) << label << " | "
               << std::setw(7) << std::fixed << std::setprecision(1) << stats.elapsed_ms << " | "
@@ -177,6 +207,28 @@ int run_alphabeta(const Args& args) {
     return 0;
 }
 
+int run_mcts(const Args& args) {
+    std::vector<Board> positions = load_positions(args.positions);
+    if (positions.empty()) {
+        std::cerr << "No hay posiciones validas en " << args.positions << "\n";
+        return 1;
+    }
+
+    std::cout << "=== MCTS Benchmark - simulations=" << args.simulations << " - "
+              << positions.size() << " posiciones ===\n\n";
+
+    const MCTSAvgStats stats = average_mcts(positions, args.simulations);
+    std::cout << "simulations | T ms avg | rollouts_avg | win_rate_avg | rollout_depth_avg\n";
+    std::cout << "------------|----------|--------------|--------------|------------------\n";
+    std::cout << std::setw(11) << args.simulations << " | "
+              << std::setw(8) << std::fixed << std::setprecision(1) << stats.elapsed_ms << " | "
+              << std::setw(12) << std::fixed << std::setprecision(0) << stats.rollouts << " | "
+              << std::setw(12) << std::fixed << std::setprecision(3) << stats.win_rate << " | "
+              << std::setw(16) << std::fixed << std::setprecision(1) << stats.tree_depth_avg
+              << "\n";
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -187,8 +239,7 @@ int main(int argc, char** argv) {
     }
 
     if (args.algo == "mcts") {
-        std::cout << "MCTS benchmark: pendiente (P2)\n";
-        return 0;
+        return run_mcts(args);
     }
 
     return run_alphabeta(args);
