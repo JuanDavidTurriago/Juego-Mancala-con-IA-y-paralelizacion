@@ -3,17 +3,11 @@ kind: Ingress
 metadata:
   name: mancala
   annotations:
-    # NGINX Ingress Controller (instalar en EKS/AKS/GKE — ver PREPARACION-FASE4.md)
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # AWS EKS: el balanceador publico lo crea el Service LoadBalancer del controlador NGINX.
-    # TLS con cert-manager (opcional, descomentar tras instalar cert-manager):
-    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "mancala-ip"
 spec:
-  ingressClassName: nginx
   rules:
-    - host: mancala.example.edu.co
+    - host: mancala.8.232.201.150.nip.io
       http:
         paths:
           - path: /
@@ -23,7 +17,7 @@ spec:
                 name: frontend
                 port:
                   number: 80
-    - host: api.mancala.example.edu.co
+    - host: api.mancala.8.232.201.150.nip.io
       http:
         paths:
           - path: /
@@ -33,8 +27,3 @@ spec:
                 name: backend
                 port:
                   number: 8000
-  # tls:
-  #   - hosts:
-  #       - mancala.example.edu.co
-  #       - api.mancala.example.edu.co
-  #     secretName: mancala-tls
