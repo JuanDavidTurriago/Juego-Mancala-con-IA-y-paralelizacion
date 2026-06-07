@@ -2,7 +2,7 @@
 
 ## Workflow propio
 
-El repositorio conserva `.github/workflows/classroom.yml` como workflow del profesor y agrega `.github/workflows/ci.yml` como pipeline propio del grupo. Este segundo workflow se ejecuta en `push` y `pull_request` hacia `main` y `Bryan`. Su objetivo es detectar errores antes del autograding: compilar el motor, ejecutar pruebas C++, ejecutar pruebas Python, construir imagenes Docker y publicar en GHCR. El analisis SonarQube vive en un workflow separado (`sonar.yml`).
+El repositorio conserva `.github/workflows/classroom.yml` como workflow del profesor y agrega `.github/workflows/ci.yml` como pipeline propio del grupo. Este segundo workflow se ejecuta en `push` y `pull_request` hacia `main`, `Bryan` y `Juan`. Su objetivo es detectar errores antes del autograding: compilar el motor, ejecutar pruebas C++, ejecutar pruebas Python, construir imagenes Docker y publicar en GHCR. El analisis SonarQube vive en un workflow separado (`sonar.yml`).
 
 La separacion es importante. `classroom.yml` pertenece al profesor y no debe modificarse innecesariamente. `ci.yml` pertenece al grupo y puede evolucionar con la implementacion. Si falla el workflow propio, el grupo tiene una senal clara de que la solucion no esta lista aunque el autograding solo revise estructura o tamanos de documentos.
 
@@ -54,6 +54,7 @@ La integracion esta **solo en YAML** (`.github/workflows/sonar.yml`). No se usa 
 El workflow `sonar.yml` ejecuta `SonarSource/sonarqube-scan-action@v6` con:
 
 - `SONAR_TOKEN` — secret del repositorio (Settings → Secrets and variables → Actions). Token de analisis creado en [SonarQube Cloud](https://sonarcloud.io).
+- `SONAR_HOST_URL` — secret del repositorio con el valor `https://sonarcloud.io`.
 - `GITHUB_TOKEN` — lo inyecta GitHub Actions automaticamente para decoracion de PRs.
 
 Configuracion del proyecto en `sonar-project.properties` (organizacion, projectKey, fuentes, tests, exclusiones y `compile_commands.json` del motor). El job compila el motor con `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` antes del escaneo.

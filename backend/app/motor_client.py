@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 import os
@@ -34,7 +34,7 @@ def _env_bool(name: str, default: bool) -> bool:
 class MotorClient:
     motor_url: str = os.getenv("MOTOR_URL", "http://motor:8080")
     timeout_seconds: float = float(os.getenv("MOTOR_TIMEOUT_SECONDS", "10"))
-    use_mock: bool = _env_bool("USE_MOCK", True)
+    use_mock: bool = field(default_factory=lambda: _env_bool("USE_MOCK", False))
 
     def _url(self, path: str) -> str:
         return f"{self.motor_url.rstrip('/')}{path}"

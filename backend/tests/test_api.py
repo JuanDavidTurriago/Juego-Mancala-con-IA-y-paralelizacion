@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app import main
-from app.motor_client import MotorClientError
+from app.motor_client import MotorClient, MotorClientError
 from app.schemas import MoveResponse
 
 
@@ -49,6 +49,16 @@ def valid_payload():
         "algoritmo": "alphabeta",
         "parametros": {"profundidad": 6, "hilos": 4},
     }
+
+
+def test_motor_client_uses_real_motor_by_default(monkeypatch):
+    monkeypatch.delenv("USE_MOCK", raising=False)
+    assert MotorClient().use_mock is False
+
+
+def test_motor_client_mock_requires_explicit_opt_in(monkeypatch):
+    monkeypatch.setenv("USE_MOCK", "true")
+    assert MotorClient().use_mock is True
 
 
 @pytest.mark.anyio
