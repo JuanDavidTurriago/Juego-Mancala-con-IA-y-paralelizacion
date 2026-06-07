@@ -13,7 +13,7 @@ COPY app ./app
 
 ENV MOTOR_URL=http://motor:8080
 ENV MOTOR_TIMEOUT_SECONDS=10
-ENV USE_MOCK=true
+ENV USE_MOCK=false
 ENV CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://frontend
 
 EXPOSE 8000

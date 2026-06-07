@@ -21,7 +21,7 @@ services:
     environment:
       MOTOR_URL: "http://motor:8080"
       MOTOR_TIMEOUT_SECONDS: "10"
-      USE_MOCK: "true"
+      USE_MOCK: "false"
       CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://frontend"
     depends_on:
       motor:

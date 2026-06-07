@@ -302,7 +302,7 @@ COPY app ./app
 # Variables de entorno por defecto (pueden sobreescribirse)
 ENV MOTOR_URL=http://motor:8080
 ENV MOTOR_TIMEOUT_SECONDS=10
-ENV USE_MOCK=true
+ENV USE_MOCK=false
 ENV CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://frontend
 
 # Expone puerto de FastAPI
@@ -401,7 +401,7 @@ services:
     environment:
       MOTOR_URL: "http://motor:8080"           # URL interna al motor
       MOTOR_TIMEOUT_SECONDS: "10"              # Timeout para peticiones al motor
-      USE_MOCK: "true"                         # Usa mock (true) o motor real (false)
+      USE_MOCK: "false"                        # El despliegue normal usa el motor real
       CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://frontend"
     depends_on:
       motor:
