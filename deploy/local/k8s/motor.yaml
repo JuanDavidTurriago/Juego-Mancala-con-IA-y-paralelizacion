@@ -18,7 +18,7 @@ spec:
         - name: ghcr-credentials
       containers:
         - name: motor
-          image: ghcr.io/juandavidturriago/mancala-motor:876a70631cba2592bbdb6f6731378d78802a8446
+          image: ghcr.io/juandavidturriago/mancala-motor:2f4727a9f13fcac1b575177f1c8f035a3e6992d2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
