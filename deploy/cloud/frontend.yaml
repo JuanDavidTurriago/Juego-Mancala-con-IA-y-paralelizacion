@@ -5,7 +5,12 @@ metadata:
   labels:
     app: frontend
 spec:
-  replicas: 2
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: frontend
@@ -14,14 +19,18 @@ spec:
       labels:
         app: frontend
     spec:
-      imagePullSecrets:
-        - name: ghcr-credentials
       containers:
         - name: frontend
-          image: ghcr.io/juandavidturriago/mancala-frontend:423411ee7a033a8a637abefb045480e440c4ceef
+          image: us-central1-docker.pkg.dev/mancala-kalah/mancala/mancala-frontend:cd2a98f04462fded40ffc034a4c1c52f707f09f3
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+          startupProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5
+            failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /
@@ -46,6 +55,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
 spec:
   selector:
     app: frontend

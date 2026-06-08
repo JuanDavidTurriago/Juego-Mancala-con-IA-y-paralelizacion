@@ -6,6 +6,11 @@ metadata:
     app: motor
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: motor
@@ -14,17 +19,21 @@ spec:
       labels:
         app: motor
     spec:
-      imagePullSecrets:
-        - name: ghcr-credentials
       containers:
         - name: motor
-          image: ghcr.io/juandavidturriago/mancala-motor:423411ee7a033a8a637abefb045480e440c4ceef
+          image: us-central1-docker.pkg.dev/mancala-kalah/mancala/mancala-motor:cd2a98f04462fded40ffc034a4c1c52f707f09f3
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
                 name: mancala-config
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /readyz

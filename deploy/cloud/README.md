@@ -1,34 +1,28 @@
 # deploy/cloud/
 
-Manifiestos YAML del despliegue en un servicio gestionado de Kubernetes
-(AWS EKS, Azure AKS, GCP GKE, DigitalOcean DOKS u otro).
+Manifiestos del despliegue activo en GKE Autopilot, proyecto
+`mancala-kalah`, region `us-central1`.
 
-**Preparacion Fase 4 (hacer ya):** leer [PREPARACION-FASE4.md](./PREPARACION-FASE4.md) — cuenta cloud, cluster de prueba, ImagePullSecret GHCR.
+## Arquitectura
 
-Reglas innegociables:
+| Archivo | Recurso principal |
+|---|---|
+| `configmap.yaml` | URL interna del motor, CORS, OpenMP y profundidad |
+| `motor.yaml` | 2 replicas C++, Service interno `motor:8080` |
+| `backend.yaml` | 3 replicas FastAPI y NEG para GKE Ingress |
+| `frontend.yaml` | 1 replica Nginx y NEG para GKE Ingress |
+| `ingress.yaml` | Ingress GCE con IP global `mancala-ip` |
 
-- Toda la configuracion del cluster debe quedar declarada en archivos YAML versionados aqui.
-- El balanceo de carga lo maneja el Service (LoadBalancer) o Ingress.
-- Cada contenedor declara `requests` y `limits` de CPU y memoria.
-- Imagenes GHCR con tag **SHA inmutable** (sin `:latest`).
-- Imagenes **privadas**: crear `ghcr-credentials` antes del apply (ver `ghcr-secret.yaml.example`).
+Las imagenes se leen desde Artifact Registry con tags SHA inmutables. No se
+usa `latest` ni se necesita `imagePullSecret`, porque GKE y el registro estan
+en el mismo proyecto de Google Cloud.
 
-## Checklist de manifiestos
-
-| Archivo | Verificacion |
-|---------|--------------|
-| `backend.yaml` | `replicas: 3`, probes, resources, `imagePullSecrets` |
-| `motor.yaml` | `resources.requests` / `limits`, probes, `imagePullSecrets` |
-| `frontend.yaml` | resources, probes, `imagePullSecrets` |
-| `ingress.yaml` | `ingressClassName: nginx`, anotaciones proxy timeout/body (EKS + NGINX Ingress) |
-| `configmap.yaml` | `USE_MOCK=false`, `MOTOR_URL=http://motor:8080`, CORS con dominio real |
-
-Alternativas de Ingress por proveedor: `ingress-aws-alb.yaml.example`, `ingress-gcp-gke.yaml.example`.
-
-## Orden de aplicacion
+## Despliegue
 
 ```bash
-bash deploy/scripts/create-ghcr-secret.sh default   # GHCR_USER + GHCR_PAT en entorno
+gcloud container clusters get-credentials mancala-gke \
+  --region us-central1 \
+  --project mancala-kalah
 
 kubectl apply -f deploy/cloud/configmap.yaml
 kubectl apply -f deploy/cloud/motor.yaml
@@ -38,18 +32,24 @@ kubectl apply -f deploy/cloud/ingress.yaml
 
 kubectl rollout status deployment/motor
 kubectl rollout status deployment/backend
-kubectl get ingress
+kubectl rollout status deployment/frontend
+kubectl get pods,svc,ingress
 ```
 
-## GHCR desde el cluster
+URLs de prueba:
 
-Prueba local con PAT:
+- Frontend: `http://mancala.8.232.201.150.nip.io`
+- API: `http://api.mancala.8.232.201.150.nip.io`
+
+## Costos
+
+GKE, el balanceador y la IP reservada consumen credito mientras existan. Al
+terminar las pruebas:
 
 ```bash
-export GHCR_USER=<github_user>
-export GHCR_PAT=<pat_read_packages>
-echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-docker pull ghcr.io/juandavidturriago/mancala-motor:<SHA>
+gcloud container clusters delete mancala-gke --region us-central1
+gcloud compute addresses delete mancala-ip --global
 ```
 
-Si el pull anonimo devuelve `unauthorized`, el ImagePullSecret es obligatorio en Kubernetes.
+Los ejemplos `ghcr-secret.yaml.example` e `ingress-aws-alb.yaml.example` se
+conservan solo como alternativas para otros proveedores.

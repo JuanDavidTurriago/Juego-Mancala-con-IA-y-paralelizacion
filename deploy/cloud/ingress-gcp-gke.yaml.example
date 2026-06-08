@@ -1,14 +1,24 @@
-# Ejemplo alternativo: GKE Ingress nativo (sin NGINX).
-# Requiere reservar IP estatica y ManagedCertificate en GCP.
+# Referencia opcional para agregar TLS al Ingress GKE de ingress.yaml.
+# El despliegue HTTP activo solo requiere reservar la IP estatica.
 #
 # gcloud compute addresses create mancala-ip --global
-# kubectl apply -f managed-cert.yaml   # recurso ManagedCertificate de GKE
+# Crear primero un recurso ManagedCertificate con los dos dominios reales:
+#
+# apiVersion: networking.gke.io/v1
+# kind: ManagedCertificate
+# metadata:
+#   name: mancala-cert
+# spec:
+#   domains:
+#     - mancala.example.edu.co
+#     - api.mancala.example.edu.co
 #
 # apiVersion: networking.k8s.io/v1
 # kind: Ingress
 # metadata:
 #   name: mancala
 #   annotations:
+#     kubernetes.io/ingress.class: gce
 #     kubernetes.io/ingress.global-static-ip-name: mancala-ip
 #     networking.gke.io/managed-certificates: mancala-cert
 # spec:
