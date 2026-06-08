@@ -1,268 +1,485 @@
-<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mancala Kalah</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mancala Kalah</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Geist:wght@500;700&display=swap" rel="stylesheet"/>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "background":               "#f5faf8",
+          "surface":                  "#f5faf8",
+          "surface-container":        "#eaefed",
+          "surface-container-low":    "#f0f5f2",
+          "surface-container-high":   "#e4e9e7",
+          "surface-container-lowest": "#ffffff",
+          "surface-variant":          "#dee4e1",
+          "surface-dim":              "#d6dbd9",
+          "on-surface":               "#171d1c",
+          "on-surface-variant":       "#3d4947",
+          "on-background":            "#171d1c",
+          "primary":                  "#00685f",
+          "primary-container":        "#008378",
+          "on-primary":               "#ffffff",
+          "on-primary-container":     "#f4fffc",
+          "secondary":                "#904d00",
+          "secondary-container":      "#fe932c",
+          "on-secondary":             "#ffffff",
+          "on-secondary-container":   "#663500",
+          "outline":                  "#6d7a77",
+          "outline-variant":          "#bcc9c6",
+          "error":                    "#ba1a1a",
+        },
+        spacing: {
+          "xs":  "8px",
+          "sm":  "16px",
+          "md":  "24px",
+          "lg":  "32px",
+          "xl":  "48px",
+        },
+        fontFamily: {
+          "sans": ["Plus Jakarta Sans", "sans-serif"],
+        },
+      }
+    }
+  }
+</script>
+<style>
+  .board-gradient {
+    background: linear-gradient(145deg, rgba(144,77,0,0.92), rgba(102,53,0,0.97));
+  }
+  .pit-inset {
+    box-shadow: inset 0px 8px 16px rgba(0,0,0,0.4), inset 0px 2px 4px rgba(0,0,0,0.6);
+  }
+  .glass-panel {
+    background: rgba(255,255,255,0.62);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.35);
+  }
 
-    <!-- ══ MODAL: Guía de juego ══════════════════════════════════════════════ -->
-    <dialog id="guideModal" aria-label="Guía de juego">
-      <div class="guide-container">
-        <div class="guide-header">
-          <h2>¿Cómo jugar Mancala Kalah?</h2>
-          <button class="guide-close" id="guideClose" aria-label="Cerrar guía" type="button">✕</button>
+  /* ── Pits dinámicos (generados por app.js) ── */
+  .pit {
+    flex: 1;
+    min-width: 0;
+    background: #E5B581;
+    border-radius: 9999px;
+    box-shadow: inset 0px 8px 16px rgba(0,0,0,0.38),
+                inset 0px 2px 4px rgba(0,0,0,0.55);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    position: relative;
+    cursor: pointer;
+    border: none;
+    padding: 6px 4px;
+    transition: box-shadow 160ms ease, transform 120ms ease;
+    overflow: hidden;
+  }
+  .pit:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+  .pit:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: inset 0px 6px 12px rgba(0,0,0,0.3),
+                0 0 0 2.5px #00685f,
+                0 6px 18px rgba(0,104,95,0.35);
+  }
+  /* Turno activo — verde jugador, rojo IA */
+  #bottomRow .pit.is-turn:not(:disabled) {
+    box-shadow: inset 0px 6px 12px rgba(0,0,0,0.3),
+                0 0 0 2.5px #00685f,
+                0 0 12px rgba(0,104,95,0.3);
+  }
+  #topRow .pit.is-turn:not(:disabled) {
+    box-shadow: inset 0px 6px 12px rgba(0,0,0,0.3),
+                0 0 0 2.5px #ba1a1a,
+                0 0 12px rgba(186,26,26,0.3);
+  }
+  .pit.is-human-move {
+    box-shadow: inset 0px 6px 12px rgba(0,0,0,0.25),
+                0 0 0 3px #00685f,
+                0 0 18px rgba(0,104,95,0.45) !important;
+  }
+  .pit.is-engine-move {
+    box-shadow: inset 0px 6px 12px rgba(0,0,0,0.25),
+                0 0 0 3px #ba1a1a,
+                0 0 18px rgba(186,26,26,0.45) !important;
+  }
+  .pit-index {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(102,53,0,0.55);
+    line-height: 1;
+    font-family: 'Geist', monospace;
+  }
+  .pit strong {
+    font-size: clamp(20px, 2.6vw, 30px);
+    font-weight: 900;
+    color: #2f1500;
+    line-height: 1;
+    font-family: 'Geist', monospace;
+  }
+  .seed-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-height: 16px;
+    max-width: 46px;
+    align-content: center;
+    justify-content: center;
+  }
+  .seed-dots i {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffdda0, #7a4415);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  /* API status dot via ::before */
+  #apiStatus::before {
+    content: "●";
+    margin-right: 5px;
+    animation: status-pulse 2s ease-in-out infinite;
+  }
+  #apiStatus.is-ok {
+    color: #00685f;
+    background-color: rgba(0,104,95,0.1);
+    border-color: rgba(0,104,95,0.25);
+  }
+  @keyframes status-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  /* Message area — oculto cuando vacío */
+  #message:empty { display: none; }
+
+  /* Hidden utility (Tailwind lo cubre pero por seguridad) */
+  .hidden { display: none !important; }
+
+  /* details summary — ocultar marker nativo */
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+
+  /* Responsive board — scroll horizontal en pantallas muy pequeñas */
+  @media (max-width: 500px) {
+    #topRow, #bottomRow {
+      min-width: 300px;
+    }
+    .board-scroll {
+      overflow-x: auto;
+    }
+  }
+</style>
+</head>
+
+<body class="bg-background text-on-surface font-sans min-h-screen flex flex-col">
+
+<!-- ══ MODAL: Cómo jugar ══════════════════════════════════════════════════ -->
+<dialog id="guideModal" class="rounded-2xl shadow-2xl p-0 border-0 w-[min(600px,95vw)] max-h-[92vh]">
+  <div class="flex flex-col max-h-[92vh]">
+
+    <!-- Cabecera modal -->
+    <div class="board-gradient px-6 py-5 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+      <h2 class="text-xl font-extrabold text-white tracking-tight">¿Cómo jugar Mancala Kalah?</h2>
+      <button id="guideClose" type="button" aria-label="Cerrar" class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/35 flex items-center justify-center text-white transition-colors">
+        <span class="material-symbols-outlined text-[20px]">close</span>
+      </button>
+    </div>
+
+    <!-- Cuerpo modal (scrollable) -->
+    <div class="overflow-y-auto p-5 flex flex-col gap-4 bg-surface-container-lowest">
+
+      <!-- Mini diagrama del tablero -->
+      <div class="bg-surface-container rounded-xl p-4 border border-outline-variant">
+        <p class="text-[11px] font-bold text-error uppercase tracking-wider mb-2 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">smart_toy</span> IA — juega de derecha a izquierda
+        </p>
+        <!-- Fila IA -->
+        <div class="flex gap-2 items-stretch mb-2">
+          <div class="w-10 bg-[#E5B581] rounded-[20px] pit-inset flex flex-col items-center justify-center py-2 px-1 text-[9px] font-bold text-[#663500]/70 text-center uppercase leading-tight tracking-widest">K<br/>IA</div>
+          <div class="flex-1 flex gap-1">
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3">6</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3">5</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3">4</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3">3</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3">2</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3">1</div>
+          </div>
+          <div class="w-10 bg-[#E5B581] rounded-[20px] pit-inset flex flex-col items-center justify-center py-2 px-1 text-[9px] font-bold text-primary text-center uppercase leading-tight tracking-widest border-2 border-primary">K<br/>Tú</div>
         </div>
-
-        <div class="guide-body">
-          <div class="guide-step">
-            <div class="step-icon">🎯</div>
-            <div>
-              <h3>Objetivo</h3>
-              <p>Captura más semillas que tu rival en tu Kalaha (almacén). El juego termina cuando un lado del tablero queda vacío. Gana quien tenga más semillas.</p>
-            </div>
+        <!-- Fila jugador -->
+        <div class="flex gap-2 items-stretch">
+          <div class="w-10 invisible"></div>
+          <div class="flex-1 flex gap-1">
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3 ring-2 ring-primary">1</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3 ring-2 ring-primary">2</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3 ring-2 ring-primary">3</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3 ring-2 ring-primary">4</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3 ring-2 ring-primary">5</div>
+            <div class="flex-1 bg-[#E5B581] rounded-full pit-inset flex items-center justify-center text-xs font-bold text-[#663500] py-3 ring-2 ring-primary">6</div>
           </div>
-
-          <div class="guide-board-diagram">
-            <div class="diag-label ai-label">← Zona de la IA &nbsp;(juega de derecha a izquierda)</div>
-            <div class="diag-row">
-              <div class="diag-store ai-store">K<br/><small>IA</small></div>
-              <div class="diag-pits">
-                <div class="diag-pit ai-pit">6</div>
-                <div class="diag-pit ai-pit">5</div>
-                <div class="diag-pit ai-pit">4</div>
-                <div class="diag-pit ai-pit">3</div>
-                <div class="diag-pit ai-pit">2</div>
-                <div class="diag-pit ai-pit">1</div>
-              </div>
-              <div class="diag-store human-store">K<br/><small>Tú</small></div>
-            </div>
-            <div class="diag-row">
-              <div class="diag-store" style="visibility:hidden"></div>
-              <div class="diag-pits">
-                <div class="diag-pit human-pit">1</div>
-                <div class="diag-pit human-pit">2</div>
-                <div class="diag-pit human-pit">3</div>
-                <div class="diag-pit human-pit">4</div>
-                <div class="diag-pit human-pit">5</div>
-                <div class="diag-pit human-pit">6</div>
-              </div>
-              <div class="diag-store" style="visibility:hidden"></div>
-            </div>
-            <div class="diag-label human-label">Tu zona &nbsp;(juegas de izquierda a derecha) →</div>
-          </div>
-
-          <div class="guide-step">
-            <div class="step-icon">✋</div>
-            <div>
-              <h3>Cómo mover</h3>
-              <p>Haz clic en uno de tus hoyos (fila inferior). Las semillas se distribuyen <strong>una a una</strong> hacia la derecha, continuando por el lado de la IA y saltando su Kalaha.</p>
-            </div>
-          </div>
-
-          <div class="guide-step">
-            <div class="step-icon">🔄</div>
-            <div>
-              <h3>Turno extra</h3>
-              <p>Si la última semilla cae en tu <strong>Kalaha</strong> (almacén derecho), ¡juegas de nuevo inmediatamente!</p>
-            </div>
-          </div>
-
-          <div class="guide-step">
-            <div class="step-icon">⚡</div>
-            <div>
-              <h3>Captura</h3>
-              <p>Si la última semilla cae en un hoyo <strong>tuyo vacío</strong>, capturas esa semilla más <strong>todas las semillas del hoyo opuesto</strong> de la IA, moviéndolas a tu Kalaha.</p>
-            </div>
-          </div>
-
-          <div class="guide-step">
-            <div class="step-icon">🏆</div>
-            <div>
-              <h3>Fin del juego</h3>
-              <p>El juego termina cuando todos los hoyos de un lado quedan vacíos. Las semillas restantes del otro lado van al Kalaha de su dueño. Gana quien acumule más semillas.</p>
-            </div>
-          </div>
-
-          <div class="guide-tip">
-            💡 <strong>Consejo:</strong> Los hoyos resaltados en <span class="tip-green">verde</span> son los que puedes jugar en tu turno.
-          </div>
+          <div class="w-10 invisible"></div>
         </div>
-
-        <div class="guide-footer">
-          <button class="btn-primary" id="guideStart" type="button">¡Entendido, a jugar!</button>
-        </div>
+        <p class="text-[11px] font-bold text-primary uppercase tracking-wider mt-2 flex items-center gap-1 justify-end">
+          Tú — juegas de izquierda a derecha <span class="material-symbols-outlined text-[14px]">person</span>
+        </p>
       </div>
-    </dialog>
 
-    <!-- ══ CABECERA ══════════════════════════════════════════════════════════ -->
-    <header class="app-header">
-      <div class="header-brand">
-        <span class="brand-icon" aria-hidden="true">🪬</span>
+      <!-- Pasos -->
+      <div class="flex gap-3 bg-surface rounded-xl p-3 border border-outline-variant items-start">
+        <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-xl flex-shrink-0">🎯</div>
         <div>
-          <h1>Mancala Kalah</h1>
-          <p class="brand-sub">Tú vs. Inteligencia Artificial</p>
+          <p class="font-bold text-on-surface text-sm">Objetivo</p>
+          <p class="text-on-surface-variant text-sm mt-0.5 leading-relaxed">Acumula más semillas que la IA en tu <strong>Kalaha</strong> (almacén derecho). El juego termina cuando un lado queda vacío.</p>
         </div>
       </div>
-      <div class="header-actions">
-        <button id="helpButton" class="icon-button" type="button" title="Cómo jugar" aria-label="Ver guía de juego">
-          <span aria-hidden="true">?</span> Cómo jugar
-        </button>
-        <span id="apiStatus" class="status">● verificando</span>
-        <button id="resetButton" class="ghost-button" type="button">↺ Reiniciar</button>
+      <div class="flex gap-3 bg-surface rounded-xl p-3 border border-outline-variant items-start">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl flex-shrink-0">✋</div>
+        <div>
+          <p class="font-bold text-on-surface text-sm">Cómo mover</p>
+          <p class="text-on-surface-variant text-sm mt-0.5 leading-relaxed">Haz clic en uno de tus hoyos (fila inferior). Las semillas se distribuyen una a una hacia la derecha, <strong>saltando el Kalaha de la IA</strong>.</p>
+        </div>
       </div>
-    </header>
+      <div class="flex gap-3 bg-surface rounded-xl p-3 border border-outline-variant items-start">
+        <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-xl flex-shrink-0">🔄</div>
+        <div>
+          <p class="font-bold text-on-surface text-sm">Turno extra</p>
+          <p class="text-on-surface-variant text-sm mt-0.5 leading-relaxed">Si la última semilla cae en <strong>tu Kalaha</strong>, ¡juegas de nuevo de inmediato!</p>
+        </div>
+      </div>
+      <div class="flex gap-3 bg-surface rounded-xl p-3 border border-outline-variant items-start">
+        <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-xl flex-shrink-0">⚡</div>
+        <div>
+          <p class="font-bold text-on-surface text-sm">Captura</p>
+          <p class="text-on-surface-variant text-sm mt-0.5 leading-relaxed">Si la última semilla cae en un <strong>hoyo tuyo vacío</strong> y el hoyo opuesto de la IA tiene semillas, capturas ambas hacia tu Kalaha.</p>
+        </div>
+      </div>
 
-    <!-- ══ CONTENIDO PRINCIPAL ════════════════════════════════════════════════ -->
-    <main class="layout">
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900 leading-relaxed">
+        💡 <strong>Consejo:</strong> Los hoyos con borde <span class="text-primary font-bold">verde</span> son los que puedes jugar en tu turno actual.
+      </div>
+    </div>
 
-      <!-- ── Área de juego ──────────────────────────────────────────────────── -->
-      <section class="game-area" aria-label="Tablero de Mancala">
+    <!-- Footer modal -->
+    <div class="px-5 py-4 border-t border-outline-variant flex-shrink-0">
+      <button id="guideStart" type="button" class="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-3 px-6 rounded-xl font-bold text-base hover:opacity-90 transition-opacity">
+        <span class="material-symbols-outlined text-[20px]">sports_esports</span>
+        ¡Entendido, a jugar!
+      </button>
+    </div>
+  </div>
+</dialog>
 
-        <!-- Tira de estado de turno -->
-        <div class="turn-strip">
-          <div class="turn-info">
-            <span class="turn-badge" id="turnBadge" aria-hidden="true">👤</span>
-            <div>
-              <span class="turn-sub">Turno</span>
-              <strong id="turnLabel">Tú (Jugador 1)</strong>
-            </div>
+<!-- ══ CABECERA ════════════════════════════════════════════════════════════ -->
+<header class="bg-background border-b border-outline-variant sticky top-0 z-40">
+  <div class="max-w-[1200px] mx-auto px-md flex justify-between items-center h-[64px]">
+    <div class="leading-tight">
+      <h1 class="text-[clamp(18px,2.5vw,28px)] font-extrabold text-on-surface tracking-tight">Mancala Kalah</h1>
+      <p class="text-xs text-on-surface-variant">Tú vs. Inteligencia Artificial</p>
+    </div>
+    <div class="flex items-center gap-sm">
+      <button id="helpButton" type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant font-semibold text-sm">
+        <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 0;">help</span>
+        <span class="hidden sm:inline">Cómo jugar</span>
+      </button>
+      <span id="apiStatus" class="px-3 py-1.5 rounded-full text-xs font-bold border border-outline-variant bg-surface-container text-on-surface-variant transition-colors">
+        verificando
+      </span>
+      <button id="resetButton" type="button" class="flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg shadow-sm hover:shadow-md transition-all font-semibold text-sm">
+        <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 0;">refresh</span>
+        Reiniciar
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ══ CONTENIDO PRINCIPAL ════════════════════════════════════════════════ -->
+<main class="flex-1 w-full max-w-[1200px] mx-auto p-md grid grid-cols-1 lg:grid-cols-12 gap-lg">
+
+  <!-- ── Área de juego (columnas 1-8) ────────────────────────────────────── -->
+  <section class="lg:col-span-8 flex flex-col gap-md">
+
+    <!-- Status Bar -->
+    <div class="glass-panel rounded-xl px-md py-3 flex justify-between items-center shadow-sm">
+      <div class="flex items-center gap-md">
+        <div class="w-11 h-11 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+          <span id="turnBadge" class="material-symbols-outlined text-on-surface-variant text-[22px]" style="font-variation-settings:'FILL' 0;">person</span>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Turno</p>
+          <p id="turnLabel" class="text-[18px] font-extrabold text-on-surface leading-tight">Tú (Jugador 1)</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Estado</p>
+        <p id="gameStatus" class="text-[18px] font-extrabold text-on-surface leading-tight">Listo</p>
+      </div>
+    </div>
+
+    <!-- Zona IA -->
+    <div class="flex items-center gap-2 -mb-2">
+      <span class="material-symbols-outlined text-on-surface-variant text-[16px]">smart_toy</span>
+      <span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Zona de la IA</span>
+    </div>
+
+    <!-- Tablero -->
+    <div class="board-scroll">
+      <div id="board" class="relative board-gradient rounded-[28px] shadow-2xl border border-[rgba(144,77,0,0.35)]" style="min-height:220px;">
+        <div class="p-[14px] flex gap-[14px] items-stretch" style="min-height:220px;">
+
+          <!-- Kalaha IA (izquierda) -->
+          <div class="w-[68px] flex-shrink-0 bg-[#E5B581] rounded-[36px] pit-inset flex flex-col items-center justify-center gap-1 py-3 px-2">
+            <p class="text-[9px] font-bold text-[#663500]/70 text-center uppercase tracking-widest leading-tight">Kalaha<br/>IA</p>
+            <span id="storeP2" class="text-[34px] font-black text-[#2f1500] leading-none" style="font-family:'Geist',monospace;">0</span>
           </div>
-          <div class="status-info">
-            <span class="turn-sub">Estado</span>
-            <strong id="gameStatus">Listo</strong>
+
+          <!-- Filas de hoyos -->
+          <div class="flex-1 flex flex-col gap-[10px] min-w-0">
+            <div id="topRow"    class="flex gap-[8px] flex-1 min-h-0"></div>
+            <div class="flex-shrink-0" style="height:1px;background:rgba(255,255,255,0.12);"></div>
+            <div id="bottomRow" class="flex gap-[8px] flex-1 min-h-0"></div>
+          </div>
+
+          <!-- Kalaha Jugador (derecha) -->
+          <div class="w-[68px] flex-shrink-0 bg-[#E5B581] rounded-[36px] pit-inset flex flex-col items-center justify-center gap-1 py-3 px-2">
+            <p class="text-[9px] font-bold text-[#663500]/70 text-center uppercase tracking-widest leading-tight">Tu<br/>Kalaha</p>
+            <span id="storeP1" class="text-[34px] font-black text-[#2f1500] leading-none" style="font-family:'Geist',monospace;">0</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Zona jugador -->
+    <div class="flex items-center gap-2 -mt-2 self-end">
+      <span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Tu zona</span>
+      <span class="material-symbols-outlined text-on-surface-variant text-[16px]">person</span>
+    </div>
+
+    <!-- Mensajes de estado -->
+    <div id="message" class="px-4 py-2.5 bg-surface-container rounded-xl text-sm text-on-surface-variant border border-outline-variant/60 leading-relaxed" role="status" aria-live="polite"></div>
+
+  </section>
+
+  <!-- ── Panel lateral (columnas 9-12) ───────────────────────────────────── -->
+  <aside class="lg:col-span-4 flex flex-col gap-md">
+
+    <!-- Panel de resultado (oculto hasta que termine la partida) -->
+    <div id="finalPanel" class="hidden bg-primary-container/10 border border-primary-container/30 rounded-xl p-md shadow-sm relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-1 h-full bg-primary rounded-l-xl"></div>
+      <div class="flex items-center gap-2 mb-sm pl-1">
+        <span class="material-symbols-outlined text-amber-500 text-[22px]" style="font-variation-settings:'FILL' 1;">emoji_events</span>
+        <h3 class="text-base font-extrabold text-on-surface">Resultado</h3>
+      </div>
+      <p id="finalText" class="text-sm text-on-surface-variant mb-md leading-relaxed pl-1"></p>
+      <button id="finalResetButton" type="button" class="w-full flex items-center justify-center gap-2 bg-surface text-primary border border-primary px-4 py-3 rounded-lg hover:bg-primary hover:text-on-primary transition-colors font-bold text-sm">
+        <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 0;">refresh</span>
+        Jugar de nuevo
+      </button>
+    </div>
+
+    <!-- Configuración de la IA -->
+    <div class="bg-surface-container rounded-xl p-md shadow-sm flex flex-col gap-sm">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-secondary text-[20px]">psychology</span>
+        <h2 class="text-base font-extrabold text-secondary">Configuración de la IA</h2>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="algorithm" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Algoritmo</label>
+        <select id="algorithm" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary">
+          <option value="alphabeta">Alpha-Beta (recomendado)</option>
+          <option value="mcts">MCTS (Monte Carlo)</option>
+        </select>
+      </div>
+
+      <div id="difficultyField" class="flex flex-col gap-1">
+        <label for="difficulty" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Dificultad</label>
+        <select id="difficulty" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary">
+          <option value="4">🟢 Fácil</option>
+          <option value="8" selected>🟡 Normal</option>
+          <option value="12">🟠 Difícil</option>
+          <option value="16">🔴 Experto</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-sm">
+        <div id="depthField" class="flex flex-col gap-1">
+          <label for="depth" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Profundidad</label>
+          <input id="depth" type="number" min="1" max="32" value="8" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"/>
+        </div>
+        <div id="simulationsField" class="flex flex-col gap-1 hidden">
+          <label for="simulations" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Simulaciones</label>
+          <input id="simulations" type="number" min="1" max="100000" value="10000" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"/>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label for="threads" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Hilos CPU</label>
+          <input id="threads" type="number" min="1" max="64" value="4" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estadísticas de la última jugada -->
+    <div class="glass-panel rounded-xl p-md shadow-sm flex flex-col gap-sm">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary text-[20px]">analytics</span>
+        <h3 class="text-base font-bold text-on-surface">Última jugada de la IA</h3>
+      </div>
+      <div class="grid grid-cols-2 gap-sm">
+        <div class="bg-surface-container-low p-sm rounded-lg border border-outline-variant/50">
+          <p class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Algoritmo</p>
+          <p id="statAlgorithm" class="text-sm font-bold text-on-surface">Alpha-Beta</p>
+        </div>
+        <div class="bg-surface-container-low p-sm rounded-lg border border-outline-variant/50">
+          <p class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Tiempo</p>
+          <p id="statTime" class="text-sm font-bold text-on-surface">— ms</p>
+        </div>
+        <div class="bg-surface-container-low p-sm rounded-lg border border-outline-variant/50">
+          <p id="statPrimaryLabel" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Profundidad</p>
+          <p id="statPrimary" class="text-sm font-bold text-on-surface">8</p>
+        </div>
+        <div class="bg-surface-container-low p-sm rounded-lg border border-outline-variant/50">
+          <p class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Hoyo elegido</p>
+          <p id="statMove" class="text-sm font-bold text-on-surface">—</p>
+        </div>
+      </div>
+
+      <!-- Detalles técnicos colapsables -->
+      <details class="mt-1">
+        <summary class="flex items-center gap-1 text-primary text-xs font-bold cursor-pointer hover:underline select-none">
+          <span>Ver detalles técnicos</span>
+          <span class="material-symbols-outlined text-[15px]">chevron_right</span>
+        </summary>
+        <div class="grid grid-cols-2 gap-sm mt-sm">
+          <div class="bg-surface-container-low p-sm rounded-lg border border-outline-variant/50">
+            <p id="statNodesLabel" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Nodos</p>
+            <p id="statNodes" class="text-sm font-bold text-on-surface">0</p>
+          </div>
+          <div class="bg-surface-container-low p-sm rounded-lg border border-outline-variant/50">
+            <p id="statSecondaryLabel" class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Podas</p>
+            <p id="statSecondary" class="text-sm font-bold text-on-surface">0</p>
           </div>
         </div>
+      </details>
+    </div>
 
-        <!-- Etiqueta zona IA -->
-        <div class="zone-label zone-ai" aria-hidden="true">
-          <span class="zone-icon">🤖</span> Zona de la IA &nbsp;←
-        </div>
+  </aside>
+</main>
 
-        <!-- Tablero -->
-        <div class="board" id="board">
-          <div class="store store-p2" aria-label="Kalaha IA">
-            <span class="store-label">Kalaha<br/>IA</span>
-            <strong id="storeP2">0</strong>
-            <span class="store-hint" aria-hidden="true">⬅</span>
-          </div>
-          <div class="pit-row pit-row-top" id="topRow"></div>
-          <div class="pit-row pit-row-bottom" id="bottomRow"></div>
-          <div class="store store-p1" aria-label="Tu Kalaha">
-            <span class="store-label">Tu<br/>Kalaha</span>
-            <strong id="storeP1">0</strong>
-            <span class="store-hint" aria-hidden="true">⬅</span>
-          </div>
-        </div>
-
-        <!-- Etiqueta zona jugador -->
-        <div class="zone-label zone-human" aria-hidden="true">
-          → &nbsp;Tu zona <span class="zone-icon">👤</span>
-        </div>
-
-        <!-- Mensaje de estado -->
-        <div id="message" class="message" role="status" aria-live="polite"></div>
-      </section>
-
-      <!-- ── Panel lateral ──────────────────────────────────────────────────── -->
-      <aside class="side-panel" aria-label="Configuración y estadísticas">
-
-        <!-- Configuración -->
-        <section class="panel-section">
-          <h2>⚙ Configuración de la IA</h2>
-
-          <label>
-            Algoritmo
-            <select id="algorithm">
-              <option value="alphabeta">Alpha-Beta (recomendado)</option>
-              <option value="mcts">MCTS (Monte Carlo)</option>
-            </select>
-          </label>
-
-          <!-- Selector de dificultad (amigable) -->
-          <label id="difficultyField">
-            Dificultad
-            <select id="difficulty">
-              <option value="4">🟢 Fácil</option>
-              <option value="8" selected>🟡 Normal</option>
-              <option value="12">🟠 Difícil</option>
-              <option value="16">🔴 Experto</option>
-            </select>
-          </label>
-
-          <!-- Inputs técnicos ocultos que usa el JS existente -->
-          <div class="settings-grid advanced-hidden">
-            <label id="depthField">
-              Profundidad
-              <input id="depth" type="number" min="1" max="32" value="8" />
-            </label>
-            <label id="simulationsField" class="hidden">
-              Simulaciones
-              <input id="simulations" type="number" min="1" max="100000" value="10000" />
-            </label>
-            <label>
-              Hilos CPU
-              <input id="threads" type="number" min="1" max="64" value="4" />
-            </label>
-          </div>
-
-          <!-- Toggle avanzado -->
-          <button class="advanced-toggle" id="advancedToggle" type="button" aria-expanded="false">
-            ▸ Parámetros avanzados
-          </button>
-        </section>
-
-        <!-- Estadísticas del motor -->
-        <section class="panel-section stats-section">
-          <h2>📊 Última jugada de la IA</h2>
-          <div class="stats-grid">
-            <div class="stat stat-algo">
-              <span>Algoritmo</span>
-              <strong id="statAlgorithm">Alpha-Beta</strong>
-            </div>
-            <div class="stat">
-              <span>Tiempo</span>
-              <strong id="statTime">— ms</strong>
-            </div>
-            <div class="stat">
-              <span id="statPrimaryLabel">Profundidad</span>
-              <strong id="statPrimary">8</strong>
-            </div>
-            <div class="stat">
-              <span>Hoyo elegido</span>
-              <strong id="statMove">—</strong>
-            </div>
-          </div>
-
-          <!-- Detalles técnicos colapsables -->
-          <details class="tech-details">
-            <summary>Ver detalles técnicos</summary>
-            <div class="stats-grid tech-stats-grid">
-              <div class="stat">
-                <span id="statNodesLabel">Nodos</span>
-                <strong id="statNodes">0</strong>
-              </div>
-              <div class="stat">
-                <span id="statSecondaryLabel">Podas</span>
-                <strong id="statSecondary">0</strong>
-              </div>
-            </div>
-          </details>
-        </section>
-
-        <!-- Panel final (resultado) -->
-        <section id="finalPanel" class="panel-section final-panel hidden">
-          <h2>🏆 Resultado</h2>
-          <p id="finalText"></p>
-          <button id="finalResetButton" class="btn-primary" type="button">↺ Jugar de nuevo</button>
-        </section>
-
-      </aside>
-    </main>
-
-    <script src="app.js"></script>
-    <script src="ui-extras.js"></script>
-  </body>
+<script src="app.js"></script>
+<script src="ui-extras.js"></script>
+</body>
 </html>
