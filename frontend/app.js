@@ -159,8 +159,11 @@ function renderPit(index) {
     button.classList.add(state.lastMoveOwner === PLAYER_ENGINE ? "is-engine-move" : "is-human-move");
   }
 
+  // Número visual 1-6 desde la perspectiva del jugador (no el índice interno)
+  const pitLabel = owner === PLAYER_HUMAN ? index + 1 : 13 - index;
+
   button.innerHTML = `
-    <span class="pit-index">${index}</span>
+    <span class="pit-index" aria-label="Hoyo ${pitLabel}">${pitLabel}</span>
     <strong>${state.board[index]}</strong>
     <span class="seed-dots" aria-hidden="true">${seedDots(state.board[index])}</span>
   `;
@@ -182,7 +185,7 @@ function renderBoard() {
 
   elements.storeP1.textContent = state.board[6];
   elements.storeP2.textContent = state.board[13];
-  elements.turnLabel.textContent = state.sideToMove === PLAYER_HUMAN ? "Jugador 1" : "Jugador 2";
+  elements.turnLabel.textContent = state.sideToMove === PLAYER_HUMAN ? "Tú (Jugador 1)" : "IA (Jugador 2)";
 }
 
 function renderStats(data = null) {

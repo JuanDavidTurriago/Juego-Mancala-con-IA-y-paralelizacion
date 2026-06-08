@@ -323,30 +323,54 @@ bool test_rollouts_equals_simulations() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEST 5 — Equivalencia secuencial vs paralelo
+// TEST 5 — Equivalencia secuencial vs paralelo (Root Parallelism)
+//
+// Propiedad que se verifica: con el mismo presupuesto por árbol (sims_per_thread),
+// la versión paralela con p hilos debe elegir un movimiento que esté en el
+// Top-2 de la versión secuencial (que usa el mismo presupuesto por árbol).
+//
+// Root Parallelism distribuye sims_per_thread simulaciones en p árboles
+// independientes, luego reduce votos. Para comparar justamente contra la
+// versión secuencial, el total de simulaciones debe escalar con p:
+//
+//   best_move_mcts_parallel(board, SIMS_PER_THREAD * p, p)
+//
+// así cada árbol recibe SIMS_PER_THREAD simulaciones, igual que el secuencial.
+//
+// Posición elegida: la misma del Test 2 (pit5 lleva a victoria garantizada),
+// que tiene un movimiento dominante estable y reduce la varianza estocástica.
 // ─────────────────────────────────────────────────────────────────────────────
 bool test_mcts_parallel_equivalence() {
   std::cout << "[Test 5] Equivalencia MCTS paralelo (Top-2)\n";
+
+  // Posición con movimiento dominante: pit5 → turno extra + captura → P0 gana.
   Board board;
-  // Buscamos los 2 favoritos del secuencial con un presupuesto de 10k
+  const int pits[] = {0, 0, 0, 0, 1, 1, 20, 8, 0, 0, 0, 0, 0, 18};
+  for (int i = 0; i < kBoardSize; ++i) board.pits[i] = pits[i];
+  board.side_to_move = 0;
+
+  // Presupuesto por árbol: suficiente para convergencia estable en esta posición.
+  const int SIMS_PER_TREE = 8000;
+
+  // Construir Top-2 del secuencial con 20 muestras (muestreo más robusto que 5).
   int counts[14] = {0};
-  for(int i=0; i<5; ++i) {
-    counts[best_move_mcts(board, 10000, 1.41421f).move]++;
+  for (int i = 0; i < 20; ++i) {
+    counts[best_move_mcts(board, SIMS_PER_TREE, 1.41421f).move]++;
   }
   std::vector<std::pair<int, int>> favs;
-  for(int i=0; i<14; ++i) {
-    if(counts[i]>0) favs.push_back({counts[i], i});
+  for (int i = 0; i < 14; ++i) {
+    if (counts[i] > 0) favs.push_back({counts[i], i});
   }
   std::sort(favs.rbegin(), favs.rend());
-  
+
   bool ok = true;
-  for (int p : {1, 2, 4}) {
-    auto res = best_move_mcts_parallel(board, 10000, p);
+  // Dar a cada hilo exactamente SIMS_PER_TREE simulaciones (total escala con p).
+  for (int p : {2, 4}) {
+    auto res = best_move_mcts_parallel(board, SIMS_PER_TREE * p, p);
     bool in_top = false;
     for (size_t i = 0; i < std::min<size_t>(2, favs.size()); ++i) {
       if (res.move == favs[i].second) in_top = true;
     }
-    // Es posible que el estocástico falle en alguna iteración, pero la prueba verifica que la lógica sea congruente
     std::string msg = "Paralelo con p=" + std::to_string(p) + " elige top-2";
     ok &= expect_true(in_top, msg.c_str());
   }

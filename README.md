@@ -25,8 +25,8 @@ No completar esta sección reduce un 10 % sobre la nota final del proyecto.
 | Nombre completo | Código | Correo institucional         |
 | --------------- | ------ | ---------------------------- |
 | Bryan Steven Panesso Avila        | 2380701 | bryan.panesso@correounivalle.edu.co     |
-| Andres Felipe Castrillon Martínez | 2380664 | andres.castrillon@correounivalle.edu.co |
-| Javier Andrés Muñoz Tavera        | 2380421 | javier.munoz@correounivalle.edu.co      |
+| Andres Felipe Castrillon Martínez | 2380664 | andres.castrillon.martinez@correounivalle.edu.co |
+| Javier Andrés Muñoz Tavera        | 2380421 | javier.tavera@correounivalle.edu.co      |
 | Juan David Turriago Orozco        | 2477182 | juan.turriago@correounivalle.edu.co     |
 
 ---
