@@ -31,6 +31,7 @@ struct MCTSAvgStats {
     double rollouts = 0.0;
     double win_rate = 0.0;
     double tree_depth_avg = 0.0;
+    double coincidence_rate = 0.0;
 };
 
 void print_usage() {
@@ -142,17 +143,20 @@ AvgStats average_parallel(const std::vector<Board>& positions, int depth, int th
     return stats;
 }
 
-MCTSAvgStats average_mcts(const std::vector<Board>& positions, int simulations) {
+MCTSAvgStats average_mcts(const std::vector<Board>& positions, const std::vector<int>& optimal_moves, int simulations) {
     MCTSAvgStats stats;
-    for (const Board& pos : positions) {
+    for (size_t i = 0; i < positions.size(); ++i) {
         const auto t0 = std::chrono::steady_clock::now();
-        MCTSResult result = best_move_mcts(pos, simulations, 1.41421f);
+        MCTSResult result = best_move_mcts(positions[i], simulations, 1.41421f);
         const auto t1 = std::chrono::steady_clock::now();
 
         stats.elapsed_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
         stats.rollouts += result.rollouts;
         stats.win_rate += result.win_rate;
         stats.tree_depth_avg += result.tree_depth_avg;
+        if (result.move == optimal_moves[i]) {
+            stats.coincidence_rate += 1.0;
+        }
     }
 
     const double count = static_cast<double>(positions.size());
@@ -160,17 +164,21 @@ MCTSAvgStats average_mcts(const std::vector<Board>& positions, int simulations) 
     stats.rollouts /= count;
     stats.win_rate /= count;
     stats.tree_depth_avg /= count;
+    stats.coincidence_rate /= count;
     return stats;
 }
 
-MCTSAvgStats average_mcts_parallel(const std::vector<Board>& positions, int simulations, int threads) {
+MCTSAvgStats average_mcts_parallel(const std::vector<Board>& positions, const std::vector<int>& optimal_moves, int simulations, int threads) {
     MCTSAvgStats stats;
-    for (const Board& pos : positions) {
-        MCTSParallelResult result = best_move_mcts_parallel(pos, simulations, threads);
+    for (size_t i = 0; i < positions.size(); ++i) {
+        MCTSParallelResult result = best_move_mcts_parallel(positions[i], simulations, threads);
         stats.elapsed_ms += result.elapsed_ms;
         stats.rollouts += result.rollouts;
         stats.win_rate += result.win_rate;
         stats.tree_depth_avg += result.tree_depth_avg;
+        if (result.move == optimal_moves[i]) {
+            stats.coincidence_rate += 1.0;
+        }
     }
 
     const double count = static_cast<double>(positions.size());
@@ -178,6 +186,7 @@ MCTSAvgStats average_mcts_parallel(const std::vector<Board>& positions, int simu
     stats.rollouts /= count;
     stats.win_rate /= count;
     stats.tree_depth_avg /= count;
+    stats.coincidence_rate /= count;
     return stats;
 }
 
@@ -230,7 +239,8 @@ void print_mcts_row(const std::string& label, const MCTSAvgStats& stats, double 
               << std::setw(7) << std::fixed << std::setprecision(1) << stats.elapsed_ms << " | "
               << std::setw(5) << std::setprecision(2) << speedup << " | "
               << std::setw(5) << std::setprecision(2) << efficiency << " | "
-              << std::setw(12) << std::fixed << std::setprecision(0) << stats.rollouts << "\n";
+              << std::setw(12) << std::fixed << std::setprecision(0) << stats.rollouts << " | "
+              << std::setw(10) << std::fixed << std::setprecision(2) << stats.coincidence_rate << "\n";
 }
 
 void run_comparison(const std::vector<Board>& positions) {
@@ -277,17 +287,23 @@ int run_mcts(const Args& args) {
 
     std::cout << "=== MCTS Parallel Benchmark - " << positions.size() << " posiciones ===\n\n";
 
+    std::cout << "Calculando movimientos optimos con Alpha-Beta (depth=8) para medir coincidencia...\n";
+    std::vector<int> optimal_moves(positions.size());
+    for (size_t i = 0; i < positions.size(); ++i) {
+        optimal_moves[i] = best_move_alphabeta(positions[i], 8).move;
+    }
+
     const std::vector<int> sim_budgets = {10000, 100000};
     const std::vector<int> thread_counts = {1, 2, 4, 8};
 
     for (int sims : sim_budgets) {
         std::cout << "[Simulations: " << sims << "]\n";
-        std::cout << "threads | T(p) ms | S(p) | E(p) | rollouts_avg\n";
-        std::cout << "--------|---------|------|------|-------------\n";
+        std::cout << "threads | T(p) ms | S(p) | E(p) | rollouts_avg | coinc_rate\n";
+        std::cout << "--------|---------|------|------|--------------|-----------\n";
         
-        MCTSAvgStats p1 = average_mcts_parallel(positions, sims, 1);
+        MCTSAvgStats p1 = average_mcts_parallel(positions, optimal_moves, sims, 1);
         for (int p : thread_counts) {
-            MCTSAvgStats stats = (p == 1) ? p1 : average_mcts_parallel(positions, sims, p);
+            MCTSAvgStats stats = (p == 1) ? p1 : average_mcts_parallel(positions, optimal_moves, sims, p);
             double speedup = stats.elapsed_ms > 0 ? p1.elapsed_ms / stats.elapsed_ms : 0.0;
             double efficiency = p > 0 ? speedup / p : 0.0;
             print_mcts_row(std::to_string(p), stats, speedup, efficiency);
