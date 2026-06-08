@@ -12,7 +12,7 @@ La implementacion final evita el modo simulado como camino principal. El backend
 4. [04-despliegue-local.md](04-despliegue-local.md): contiene instrucciones de Docker Compose, pruebas con `curl`, imagenes locales y manifiestos para kind/minikube.
 5. [05-despliegue-nube.md](05-despliegue-nube.md): define el despliegue Kubernetes de nube, replicas, recursos, probes, imagenes GHCR e Ingress.
 6. [06-cicd.md](06-cicd.md): resume el pipeline propio, pruebas, build de imagenes, publicacion en GHCR y declaracion de analisis SonarQube.
-7. [07-analisis-comparativo.md](07-analisis-comparativo.md): explica como comparar ejecuciones secuenciales y paralelas con el benchmark del motor.
+7. [07-analisis-comparativo.md](07-analisis-comparativo.md): detalla las pruebas de carga HTTP usando k6 para comparar el escalamiento vertical (local) vs horizontal (nube).
 8. [08-conclusiones.md](08-conclusiones.md): sintetiza resultados, aprendizajes y limites reales del proyecto.
 
 ## Como reproducir la solucion
@@ -46,3 +46,18 @@ La respuesta debe incluir los campos `move`, `evaluation`, `elapsed_ms`, `stats.
 El proyecto queda preparado para tres niveles de evidencia. Primero, las pruebas unitarias del motor validan reglas delicadas del juego: conservacion de semillas, salto del store rival, turno extra, captura, no-captura y barrido de final de partida. Segundo, las pruebas del backend validan salud, readiness, CORS explicito, schema Pydantic y delegacion hacia un cliente de motor intercambiable en pruebas. Tercero, el benchmark `bench` permite ejecutar las posiciones fijas de `motor/tests/suite.txt`: en Alpha-Beta produce tablas de tiempo, speedup, eficiencia, nodos y podas para hilos `1,2,4,8`; en MCTS reporta tiempo promedio, rollouts, win rate y profundidad promedio de rollout.
 
 La documentacion no pretende reemplazar la sustentacion. Su funcion es dejar claro que la solucion tiene separacion por servicios, usa paralelismo real, es reproducible en local, tiene manifiestos de nube con valores concretos, y cuenta con CI/CD propio sin tocar el workflow `classroom.yml` del profesor.
+
+## Mapeo a la rúbrica
+
+| Criterio de la rúbrica | Archivo donde se evalúa |
+|------------------------|-------------------------|
+| Motores de Mancala: corrección | [02-motor.md](02-motor.md) |
+| Paralelización con OpenMP | [03-paralelizacion.md](03-paralelizacion.md) |
+| Instrumentación local | [03-paralelizacion.md](03-paralelizacion.md) |
+| Separación de componentes | [01-arquitectura.md](01-arquitectura.md) |
+| Despliegue local | [04-despliegue-local.md](04-despliegue-local.md) |
+| Despliegue en la nube con Kubernetes | [05-despliegue-nube.md](05-despliegue-nube.md) |
+| CI/CD y calidad de código | [06-cicd.md](06-cicd.md) |
+| Análisis comparativo local vs. nube | [07-analisis-comparativo.md](07-analisis-comparativo.md) |
+| Claridad de explicaciones | transversal a todos |
+| Conclusiones | [08-conclusiones.md](08-conclusiones.md) |
