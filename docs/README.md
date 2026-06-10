@@ -23,8 +23,6 @@ El camino recomendado para una persona externa al grupo es Docker Compose:
 docker compose -f deploy/local/docker-compose.yml up --build
 ```
 
-Si quieres los comandos de prueba y validacion separados por componente, revisa [TESTING.md](../TESTING.md).
-
 Con el stack arriba se esperan estos servicios:
 
 - Frontend: `http://localhost:8080`
